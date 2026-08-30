@@ -430,8 +430,9 @@ struct CreatePlanView: View {
             creating = true
             createError = nil
             let normalizedCurrency = draft.currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            let normalizedDescription = [draft.type.rawValue, draft.details].
-                filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.joined(separator: " · ")
+            let normalizedDescription = [draft.type.rawValue, draft.details]
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .joined(separator: " · ")
 
             do {
                 _ = try await model.createPlan(

@@ -72,8 +72,8 @@ struct HomeView: View {
                                     .foregroundStyle(PaktlyColor.secondaryInk)
 
                                 HStack(spacing: 12) {
-                                    compactBalance("You owe", value: money(model.youOweMinor), color: PaktlyColor.coral)
-                                    compactBalance("You’re owed", value: money(model.youAreOwedMinor), color: PaktlyColor.mint)
+                                    compactBalance(title: "You owe", value: money(model.youOweMinor), color: PaktlyColor.coral)
+                                    compactBalance(title: "You’re owed", value: money(model.youAreOwedMinor), color: PaktlyColor.mint)
                                 }
                             }
                         }

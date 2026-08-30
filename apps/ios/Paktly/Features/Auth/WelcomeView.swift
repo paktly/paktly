@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @EnvironmentObject private var session: AppSession
+    @State private var pendingMode: SmartAccountAuthenticationMode?
 
     var body: some View {
         ZStack {
@@ -37,32 +38,36 @@ struct WelcomeView: View {
                 Spacer()
 
                 Button {
-                    Task { await session.authenticate(mode: .signIn) }
+                    authenticate(.signIn)
                 } label: {
                     HStack {
-                        if session.state == .authenticating {
+                        if pendingMode == .signIn {
                             ProgressView().tint(PaktlyColor.background)
                         } else {
                             Image(systemName: "faceid")
                         }
-                        Text(session.state == .authenticating ? "Signing in…" : "Continue with passkey")
+                        Text(pendingMode == .signIn ? "Signing in…" : "Continue with passkey")
                     }
                 }
                 .buttonStyle(PaktlyPrimaryButtonStyle())
-                .disabled(session.state == .authenticating)
+                .disabled(pendingMode != nil)
 
                 Button {
-                    Task {
-                        await session.authenticate(mode: .signUp)
-                    }
+                    authenticate(.signUp)
                 } label: {
-                    Text("Create an account")
+                    HStack {
+                        if pendingMode == .signUp {
+                            ProgressView()
+                        }
+                        Text(pendingMode == .signUp ? "Creating account…" : "Create an account")
+                    }
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(PaktlyColor.forest)
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .controlSize(.large)
                 .padding(.top, 18)
-                .disabled(session.state == .authenticating)
+                .disabled(pendingMode != nil)
 
                 if session.state == .failed {
                     Text("We couldn’t sign you in. Please try again.")
@@ -81,5 +86,14 @@ struct WelcomeView: View {
             .padding(24)
         }
         .foregroundStyle(PaktlyColor.ink)
+    }
+
+    private func authenticate(_ mode: SmartAccountAuthenticationMode) {
+        guard pendingMode == nil else { return }
+        pendingMode = mode
+        Task { @MainActor in
+            await session.authenticate(mode: mode)
+            pendingMode = nil
+        }
     }
 }

@@ -45,12 +45,13 @@ export async function createSocketFiSession(
   const token = randomBytes(32).toString("base64url");
   const subjectHash = hashToken(identity.subject).slice(0, 32);
   const syntheticEmail = `socketfi+${subjectHash}@users.paktly.invalid`;
-  const safeDisplayName = displayName?.trim() || identity.username?.trim() || "Paktly member";
+  const safeDisplayName = displayName?.trim() || "Paktly member";
 
   return database.begin(async (tx) => {
     const [existing] = await tx`
-      SELECT u.id,u.email FROM auth_identities i
+      SELECT u.id,u.email,p.display_name FROM auth_identities i
       JOIN users u ON u.id=i.user_id
+      JOIN user_profiles p ON p.user_id=u.id
       WHERE i.provider='SOCKETFI' AND i.provider_subject=${identity.subject}
       FOR UPDATE
     `;
@@ -71,9 +72,12 @@ export async function createSocketFiSession(
         INSERT INTO user_profiles(user_id,display_name) VALUES(${String(user.id)},${safeDisplayName})
         ON CONFLICT(user_id) DO NOTHING
       `;
-    } else if (displayName?.trim()) {
+    } else if (
+      displayName?.trim() ||
+      (identity.username && String(user.display_name) === identity.username)
+    ) {
       await tx`
-        UPDATE user_profiles SET display_name=${displayName.trim()},updated_at=now()
+        UPDATE user_profiles SET display_name=${safeDisplayName},updated_at=now()
         WHERE user_id=${String(user.id)}
       `;
     }

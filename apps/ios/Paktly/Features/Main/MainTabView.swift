@@ -15,6 +15,6 @@ struct MainTabView: View {
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
         }
-        .task { if model.state == .idle { await model.refresh() } }
+        .task { await model.refresh() }
     }
 }

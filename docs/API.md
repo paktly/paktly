@@ -4,6 +4,8 @@ All endpoints are under `/api/v1`. Authenticated calls use `Authorization: Beare
 
 `POST /auth/socketfi` accepts a SocketFi access token from the native passkey flow and returns a Paktly access token. The backend verifies the SocketFi RS256 signature and its issuer, audience, client ID, native origin, network, subject, and expiration. SocketFi identities are stored separately from Paktly sessions; wallet addresses are network-specific. Never send `SOCKETFI_CLIENT_SECRET` to the iOS app.
 
+Paktly profile identity is independent from SocketFi's internal username. `GET /me` returns the user's Paktly display name, optional Paktly username, and the active network's linked SocketFi smart-account address. `PATCH /me` owns Paktly username changes and accepts lowercase letters, numbers, and underscores only.
+
 Core routes:
 
 - `GET/PATCH /me`

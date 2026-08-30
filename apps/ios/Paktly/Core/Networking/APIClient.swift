@@ -1,7 +1,19 @@
 import Foundation
 import Security
 
-struct APIUser: Codable, Identifiable, Sendable { let id: String; let email: String; let displayName: String }
+struct APISmartAccount: Codable, Sendable {
+    let provider: String
+    let network: String
+    let address: String
+}
+
+struct APIUser: Codable, Identifiable, Sendable {
+    let id: String
+    let email: String
+    let displayName: String
+    let username: String?
+    let smartAccount: APISmartAccount?
+}
 struct APIGroup: Codable, Identifiable, Sendable { let id: String; let name: String; let description: String?; let defaultCurrency: String; let role: String?; let memberCount: Int? }
 struct APIGroupMember: Codable, Identifiable, Sendable { let id: String; let email: String; let displayName: String; let avatarUrl: String?; let role: String }
 struct APIExpense: Codable, Identifiable, Sendable {
@@ -54,6 +66,8 @@ private struct ProfilePayload: Decodable {
     let id: String
     let email: String
     let displayName: String
+    let username: String?
+    let smartAccount: APISmartAccount?
 }
 
 private struct ProfileResponse: Decodable {
@@ -62,6 +76,7 @@ private struct ProfileResponse: Decodable {
 
 private struct UpdateProfileRequest: Encodable {
     let displayName: String
+    let username: String?
 }
 
 private struct UpdatedProfilePayload: Decodable {
@@ -237,12 +252,14 @@ actor APIClient {
         return APIUser(
             id: response.profile.id,
             email: response.profile.email,
-            displayName: response.profile.displayName
+            displayName: response.profile.displayName,
+            username: response.profile.username,
+            smartAccount: response.profile.smartAccount
         )
     }
 
-    func updateProfile(displayName: String) async throws {
-        let body = UpdateProfileRequest(displayName: displayName)
+    func updateProfile(displayName: String, username: String?) async throws {
+        let body = UpdateProfileRequest(displayName: displayName, username: username)
         _ = try await send(
             UpdatedProfileResponse.self,
             path: "me",

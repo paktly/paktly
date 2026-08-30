@@ -20,7 +20,7 @@ suite("SocketFi identity persistence", () => {
     trustedProxies: ["loopback", "linklocal", "uniquelocal"],
     socketFi: {
       apiUrl: "https://api.socket.fi",
-      clientId: "paktly",
+      clientId: "sf_client_live_mq2aa2w2ofwynne6gkftyendov8k",
       clientSecret: "test-socketfi-secret",
       issuer: "https://socket.fi",
       origin: "https://socket.fi",
@@ -39,21 +39,24 @@ suite("SocketFi identity persistence", () => {
 
   it("maps one SocketFi subject to one Paktly user and updates its network wallet", async () => {
     const subject = `socketfi-test-${randomUUID()}`;
+    const addressSuffix = randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+    const firstAddress = `CTESTNETONE${addressSuffix}`;
+    const secondAddress = `CTESTNETTWO${addressSuffix}`;
     const first = await createSocketFiSession(app.db, {
       subject,
-      username: "Native member",
-      wallets: { TESTNET: "CTESTNETONE" },
+      username: "socketfi-123456",
+      wallets: { TESTNET: firstAddress },
       network: "TESTNET"
     });
     const second = await createSocketFiSession(app.db, {
       subject,
-      username: "Native member",
-      wallets: { TESTNET: "CTESTNETTWO" },
+      username: "socketfi-123456",
+      wallets: { TESTNET: secondAddress },
       network: "TESTNET"
     });
 
     expect(second.user.id).toBe(first.user.id);
-    expect(second.wallet).toBe("CTESTNETTWO");
+    expect(second.wallet).toBe(secondAddress);
     expect(second.accessToken).not.toBe(first.accessToken);
 
     const [identityCount] = await app.db`
@@ -61,5 +64,21 @@ suite("SocketFi identity persistence", () => {
       WHERE provider='SOCKETFI' AND provider_subject=${subject}
     `;
     expect(Number(identityCount?.count)).toBe(1);
+
+    const profile = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: { authorization: `Bearer ${second.accessToken}` }
+    });
+    expect(profile.statusCode).toBe(200);
+    expect(profile.json().profile).toMatchObject({
+      display_name: "Paktly member",
+      username: null,
+      smartAccount: {
+        provider: "SOCKETFI",
+        network: "TESTNET",
+        address: secondAddress
+      }
+    });
   });
 });

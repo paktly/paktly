@@ -53,11 +53,15 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       authenticated.get("/me", async (request) => {
         const userId = request.authenticatedUser!.id;
         const [profile] = await app.db`SELECT u.id,u.email,p.display_name,p.username,p.avatar_url,p.default_currency,p.locale,p.timezone FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id=${userId}`;
-        return { profile };
+        const [smartAccount] = await app.db`
+          SELECT provider,network,address FROM wallet_addresses
+          WHERE user_id=${userId} AND provider='SOCKETFI' AND network=${environment.socketFi.network}
+        `;
+        return { profile: { ...profile, smartAccount: smartAccount ?? null } };
       });
 
       authenticated.patch("/me", async (request) => {
-        const body = parse(z.object({ displayName: z.string().trim().min(1).max(80).optional(), username: z.string().trim().min(3).max(30).nullable().optional(), avatarUrl: z.string().url().nullable().optional(), defaultCurrency: currency.optional(), locale: z.string().min(2).max(20).optional(), timezone: z.string().min(1).max(80).optional() }), request.body, app.httpErrors.badRequest);
+        const body = parse(z.object({ displayName: z.string().trim().min(1).max(80).optional(), username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/, "Use 3–30 lowercase letters, numbers, or underscores.").nullable().optional(), avatarUrl: z.string().url().nullable().optional(), defaultCurrency: currency.optional(), locale: z.string().min(2).max(20).optional(), timezone: z.string().min(1).max(80).optional() }), request.body, app.httpErrors.badRequest);
         const userId = request.authenticatedUser!.id;
         const [profile] = await app.db`
           UPDATE user_profiles SET

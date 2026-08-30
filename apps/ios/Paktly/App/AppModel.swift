@@ -36,7 +36,10 @@ final class AppModel: ObservableObject {
         _ = try await client.createGroup(name: name, description: description, currency: currency); await refresh()
     }
 
-    func updateProfile(displayName: String) async throws { try await client.updateProfile(displayName: displayName); currentUser = try await client.me() }
+    func updateProfile(displayName: String, username: String?) async throws {
+        try await client.updateProfile(displayName: displayName, username: username)
+        currentUser = try await client.me()
+    }
 
     func submitExpense(groupID: String, draft: ExpenseDraft) async -> Bool {
         do { try await client.addExpense(groupID: groupID, draft: draft) }

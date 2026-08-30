@@ -2,9 +2,12 @@
 
 All endpoints are under `/api/v1`. Authenticated calls use `Authorization: Bearer <token>`. The non-production `POST /auth/dev-session` endpoint supplies a complete local testing session; production identity providers plug into the same session model.
 
+`POST /auth/socketfi` accepts a SocketFi access token from the native passkey flow and returns a Paktly access token. The backend verifies the SocketFi RS256 signature and its issuer, audience, client ID, native origin, network, subject, and expiration. SocketFi identities are stored separately from Paktly sessions; wallet addresses are network-specific. Never send `SOCKETFI_CLIENT_SECRET` to the iOS app.
+
 Core routes:
 
 - `GET/PATCH /me`
+- `POST /auth/socketfi`
 - `GET/POST /groups`
 - `GET /groups/:groupId`
 - `POST /groups/:groupId/invitations`

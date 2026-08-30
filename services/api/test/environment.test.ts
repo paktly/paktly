@@ -12,7 +12,15 @@ describe("loadEnvironment", () => {
       nodeEnvironment: "development",
       rateLimitMax: 300,
       rateLimitWindowMs: 60_000,
-      trustedProxies: ["loopback", "linklocal", "uniquelocal"]
+      trustedProxies: ["loopback", "linklocal", "uniquelocal"],
+      socketFi: {
+        apiUrl: "https://api.socket.fi",
+        clientId: "paktly",
+        clientSecret: "development-only-socketfi-secret",
+        issuer: "https://socket.fi",
+        origin: "https://socket.fi",
+        network: "TESTNET"
+      }
     });
   });
 

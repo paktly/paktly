@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct PaktlyApp: App {
     @StateObject private var session = AppSession(
-        smartAccountService: PreviewSmartAccountService()
+        smartAccountService: SocketFiNativeSmartAccountService()
     )
     @StateObject private var model = AppModel()
 

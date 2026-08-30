@@ -40,6 +40,16 @@ private struct DevelopmentSessionResponse: Decodable {
     let user: APIUser
 }
 
+private struct SocketFiSessionRequest: Encodable {
+    let accessToken: String
+    let displayName: String?
+}
+
+private struct SocketFiSessionResponse: Decodable {
+    let accessToken: String
+    let user: APIUser
+}
+
 private struct ProfilePayload: Decodable {
     let id: String
     let email: String
@@ -200,6 +210,18 @@ actor APIClient {
             path: "auth/dev-session",
             method: "POST",
             body: body,
+            authenticated: false
+        )
+        try KeychainTokenStore.save(response.accessToken)
+        return response.user
+    }
+
+    func socketFiSignIn(accessToken: String, displayName: String?) async throws -> APIUser {
+        let response = try await send(
+            SocketFiSessionResponse.self,
+            path: "auth/socketfi",
+            method: "POST",
+            body: SocketFiSessionRequest(accessToken: accessToken, displayName: displayName),
             authenticated: false
         )
         try KeychainTokenStore.save(response.accessToken)

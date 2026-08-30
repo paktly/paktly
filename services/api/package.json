@@ -23,6 +23,7 @@
     "@fastify/sensible": "6.0.5",
     "@pakt/api-types": "workspace:*",
     "fastify": "5.12.1",
+    "jose": "6.2.3",
     "postgres": "3.4.9",
     "zod": "catalog:"
   },

@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z, type ZodType } from "zod";
 import type { Environment } from "../../config/environment.js";
-import { createDevelopmentSession, hashToken, requireAuthentication } from "../auth/authentication.js";
+import { createDevelopmentSession, createSocketFiSession, hashToken, requireAuthentication } from "../auth/authentication.js";
+import { verifySocketFiToken } from "../auth/socketfi.js";
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
 const uuid = z.string().uuid();
@@ -26,6 +27,24 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       if (environment.nodeEnvironment === "production") throw app.httpErrors.notFound();
       const body = parse(z.object({ email: z.string().email(), displayName: z.string().trim().min(1).max(80) }), request.body, app.httpErrors.badRequest);
       return createDevelopmentSession(app.db, body);
+    });
+
+    app.post("/auth/socketfi", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+      const body = parse(
+        z.object({
+          accessToken: z.string().min(100).max(16_384),
+          displayName: z.string().trim().min(1).max(80).optional()
+        }),
+        request.body,
+        app.httpErrors.badRequest
+      );
+      let identity;
+      try {
+        identity = await verifySocketFiToken(body.accessToken, environment.socketFi);
+      } catch {
+        throw app.httpErrors.unauthorized("SocketFi authentication is invalid or expired.");
+      }
+      return createSocketFiSession(app.db, identity, body.displayName);
     });
 
     app.register(async (authenticated) => {

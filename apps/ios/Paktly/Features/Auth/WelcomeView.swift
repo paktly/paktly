@@ -2,8 +2,6 @@ import SwiftUI
 
 struct WelcomeView: View {
     @EnvironmentObject private var session: AppSession
-    @State private var email = "alex@paktly.local"
-    @State private var displayName = "Alex"
 
     var body: some View {
         ZStack {
@@ -38,20 +36,8 @@ struct WelcomeView: View {
 
                 Spacer()
 
-                #if DEBUG
-                VStack(spacing: 10) {
-                    TextField("Display name", text: $displayName)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Email", text: $email)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .textFieldStyle(.roundedBorder)
-                }
-                .padding(.bottom, 16)
-                #endif
-
                 Button {
-                    Task { await session.authenticate(email: email, displayName: displayName) }
+                    Task { await session.authenticate(mode: .signIn) }
                 } label: {
                     HStack {
                         if session.state == .authenticating {
@@ -63,7 +49,20 @@ struct WelcomeView: View {
                     }
                 }
                 .buttonStyle(PaktlyPrimaryButtonStyle())
-                .disabled(session.state == .authenticating || email.isEmpty || displayName.isEmpty)
+                .disabled(session.state == .authenticating)
+
+                Button {
+                    Task {
+                        await session.authenticate(mode: .signUp)
+                    }
+                } label: {
+                    Text("Create an account")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(PaktlyColor.forest)
+                .padding(.top, 18)
+                .disabled(session.state == .authenticating)
 
                 if session.state == .failed {
                     Text("We couldn’t sign you in. Please try again.")

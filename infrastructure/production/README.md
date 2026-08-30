@@ -17,7 +17,7 @@ openssl rand -hex 32
 openssl rand -hex 32
 ```
 
-Edit `/opt/paktly/.env` and replace both password placeholders with the generated URL-safe hexadecimal values. Keep real secrets out of Git.
+Edit `/opt/paktly/.env`, replace both password placeholders, and configure the server-only SocketFi client secret. Keep real secrets out of Git and never copy `SOCKETFI_CLIENT_SECRET` into Xcode.
 
 Deploy the checked-out commit:
 
@@ -83,7 +83,7 @@ The job writes compressed custom-format PostgreSQL dumps, creates SHA-256 checks
 
 ## Authentication launch gate
 
-`POST /api/v1/auth/dev-session` is disabled whenever `NODE_ENV=production`. The public API can be deployed now for infrastructure validation, but authenticated product flows remain intentionally closed until SocketFi supplies a documented production identity assertion and server-verification contract. Do not enable the development session route in production.
+`POST /api/v1/auth/dev-session` is disabled whenever `NODE_ENV=production`. Production authentication uses `POST /api/v1/auth/socketfi`. Before deploying it, register Paktly with SocketFi, configure `SOCKETFI_PROJECT_SECRETS` on SocketFi, place the matching secret only in `/opt/paktly/.env`, publish the SocketFi RP-domain Apple association, and deploy both APIs. Keep `SOCKETFI_NETWORK=TESTNET` until the account and contract paths complete security review.
 
 ## Firewall
 

@@ -2,7 +2,7 @@
 
 The native client targets iOS 17 and talks to the persisted `/api/v1` service. Its Plans, Activity, and Balances tabs are functional. Expense creation supports equal, exact, percentage, shares, and simple itemized allocation; failed expense submissions are stored atomically under Application Support and replayed with their original idempotency key.
 
-Device, simulator, Debug, and Release builds use `https://api.paktly.io/api/v1`. Generate the project with `xcodegen generate`, then run the `Paktly` scheme. The checked-in adapter still calls the non-production session route after the local passkey preview; that route is deliberately unavailable on the production API. Authenticated device testing therefore requires the approved SocketFi/identity-provider adapter and backend verifier.
+Device, simulator, Debug, and Release builds use `https://api.paktly.io/api/v1`. Generate the project with `xcodegen generate`, then run the `Paktly` scheme. Authentication uses SocketFi's native TESTNET protocol and Apple's passkey UI; it does not open hosted auth. Physical-device testing requires the `socket.fi` Apple App Site Association deployment to list `GC29BX444D.io.paktly.app` and the generated target to retain `webcredentials:socket.fi`.
 
 The generated application Info.plist explicitly supplies the production API URL so device and test-host builds cannot silently fall back to localhost.
 

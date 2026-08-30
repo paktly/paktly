@@ -7,7 +7,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
 
 suite("expense-sharing MVP end to end", () => {
-  const environment: Environment = { apiHost: "127.0.0.1", apiPort: 4000, corsOrigins: ["http://localhost:3000"], databaseUrl: databaseUrl!, logLevel: "silent", nodeEnvironment: "test", rateLimitMax: 300, rateLimitWindowMs: 60_000, trustedProxies: ["loopback", "linklocal", "uniquelocal"] };
+  const environment: Environment = { apiHost: "127.0.0.1", apiPort: 4000, corsOrigins: ["http://localhost:3000"], databaseUrl: databaseUrl!, logLevel: "silent", nodeEnvironment: "test", rateLimitMax: 300, rateLimitWindowMs: 60_000, trustedProxies: ["loopback", "linklocal", "uniquelocal"], socketFi: { apiUrl: "https://api.socket.fi", clientId: "paktly", clientSecret: "test-socketfi-secret", issuer: "https://socket.fi", origin: "https://socket.fi", network: "TESTNET" } };
   let app: Awaited<ReturnType<typeof createApp>>;
   const sessions = new Map<string, { token: string; id: string }>();
   let groupId = "";

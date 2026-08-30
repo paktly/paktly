@@ -14,6 +14,12 @@ const environmentSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  SOCKETFI_API_URL: z.string().url().default("https://api.socket.fi"),
+  SOCKETFI_CLIENT_ID: z.string().min(3).default("paktly"),
+  SOCKETFI_CLIENT_SECRET: z.string().min(16).default("development-only-socketfi-secret"),
+  SOCKETFI_ISSUER: z.string().url().default("https://socket.fi"),
+  SOCKETFI_ORIGIN: z.string().url().default("https://socket.fi"),
+  SOCKETFI_NETWORK: z.enum(["TESTNET", "PUBLIC"]).default("TESTNET"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -27,6 +33,14 @@ export type Environment = {
   rateLimitMax: number;
   rateLimitWindowMs: number;
   trustedProxies: string[];
+  socketFi: {
+    apiUrl: string;
+    clientId: string;
+    clientSecret: string;
+    issuer: string;
+    origin: string;
+    network: "TESTNET" | "PUBLIC";
+  };
 };
 
 export function loadEnvironment(
@@ -65,6 +79,11 @@ export function loadEnvironment(
         "Invalid environment configuration: production CORS_ORIGINS must use HTTPS"
       );
     }
+    if (!source.SOCKETFI_CLIENT_ID || !source.SOCKETFI_CLIENT_SECRET) {
+      throw new Error(
+        "Invalid environment configuration: SOCKETFI_CLIENT_ID and SOCKETFI_CLIENT_SECRET are required in production"
+      );
+    }
   }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
@@ -83,6 +102,14 @@ export function loadEnvironment(
     nodeEnvironment: parsed.data.NODE_ENV,
     rateLimitMax: parsed.data.RATE_LIMIT_MAX,
     rateLimitWindowMs: parsed.data.RATE_LIMIT_WINDOW_MS,
-    trustedProxies
+    trustedProxies,
+    socketFi: {
+      apiUrl: parsed.data.SOCKETFI_API_URL,
+      clientId: parsed.data.SOCKETFI_CLIENT_ID,
+      clientSecret: parsed.data.SOCKETFI_CLIENT_SECRET,
+      issuer: parsed.data.SOCKETFI_ISSUER,
+      origin: parsed.data.SOCKETFI_ORIGIN,
+      network: parsed.data.SOCKETFI_NETWORK
+    }
   };
 }

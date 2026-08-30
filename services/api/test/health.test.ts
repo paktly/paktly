@@ -13,7 +13,8 @@ const testEnvironment: Environment = {
   nodeEnvironment: "test",
   rateLimitMax: 300,
   rateLimitWindowMs: 60_000,
-  trustedProxies: ["loopback", "linklocal", "uniquelocal"]
+  trustedProxies: ["loopback", "linklocal", "uniquelocal"],
+  socketFi: { apiUrl: "https://api.socket.fi", clientId: "paktly", clientSecret: "test-socketfi-secret", issuer: "https://socket.fi", origin: "https://socket.fi", network: "TESTNET" }
 };
 
 const apps: Awaited<ReturnType<typeof createApp>>[] = [];

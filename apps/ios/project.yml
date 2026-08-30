@@ -23,6 +23,11 @@ targets:
       properties:
         CFBundleDisplayName: Paktly
         PaktlyAPIBaseURL: https://api.paktly.io/api/v1
+        SocketFiAPIBaseURL: https://api.socket.fi
+        SocketFiClientID: paktly
+        SocketFiApplicationID: io.paktly.app
+        SocketFiNetwork: TESTNET
+        SocketFiRPID: socket.fi
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIApplicationSupportsIndirectInputEvents: true
@@ -32,6 +37,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.paktly.app
+        DEVELOPMENT_TEAM: GC29BX444D
         CODE_SIGN_ENTITLEMENTS: Paktly/Paktly.entitlements
     scheme:
       testTargets:

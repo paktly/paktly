@@ -19,13 +19,16 @@ final class AppSession: ObservableObject {
         self.apiClient = apiClient
     }
 
-    func authenticate(email: String, displayName: String) async {
+    func authenticate(mode: SmartAccountAuthenticationMode, displayName: String? = nil) async {
         guard state != .authenticating else { return }
         state = .authenticating
 
         do {
-            let smartSession = try await smartAccountService.authenticate()
-            _ = try await apiClient.developmentSignIn(email: email, displayName: displayName)
+            let smartSession = try await smartAccountService.authenticate(mode: mode)
+            _ = try await apiClient.socketFiSignIn(
+                accessToken: smartSession.socketFiAccessToken,
+                displayName: displayName
+            )
             state = .signedIn(smartSession)
         } catch {
             state = .failed

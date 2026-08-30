@@ -24,7 +24,7 @@ targets:
         CFBundleDisplayName: Paktly
         PaktlyAPIBaseURL: https://api.paktly.io/api/v1
         SocketFiAPIBaseURL: https://api.socket.fi
-        SocketFiClientID: paktly
+        SocketFiClientID: sf_client_live_mq2aa2w2ofwynne6gkftyendov8k
         SocketFiApplicationID: io.paktly.app
         SocketFiNetwork: TESTNET
         SocketFiRPID: socket.fi

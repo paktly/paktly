@@ -15,7 +15,7 @@ describe("loadEnvironment", () => {
       trustedProxies: ["loopback", "linklocal", "uniquelocal"],
       socketFi: {
         apiUrl: "https://api.socket.fi",
-        clientId: "paktly",
+        clientId: "sf_client_live_mq2aa2w2ofwynne6gkftyendov8k",
         clientSecret: "development-only-socketfi-secret",
         issuer: "https://socket.fi",
         origin: "https://socket.fi",

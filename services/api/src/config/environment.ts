@@ -15,7 +15,10 @@ const environmentSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   SOCKETFI_API_URL: z.string().url().default("https://api.socket.fi"),
-  SOCKETFI_CLIENT_ID: z.string().min(3).default("paktly"),
+  SOCKETFI_CLIENT_ID: z
+    .string()
+    .min(3)
+    .default("sf_client_live_mq2aa2w2ofwynne6gkftyendov8k"),
   SOCKETFI_CLIENT_SECRET: z.string().min(16).default("development-only-socketfi-secret"),
   SOCKETFI_ISSUER: z.string().url().default("https://socket.fi"),
   SOCKETFI_ORIGIN: z.string().url().default("https://socket.fi"),

@@ -71,4 +71,7 @@ jobs:
         run: xcodegen generate
       - name: Build and test without signing
         working-directory: apps/ios
-        run: xcodebuild -project Paktly.xcodeproj -scheme Paktly -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO test
+        run: |
+          destination_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          test -n "$destination_id"
+          xcodebuild -project Paktly.xcodeproj -scheme Paktly -configuration Debug -destination "platform=iOS Simulator,id=$destination_id" CODE_SIGNING_ALLOWED=NO test

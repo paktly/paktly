@@ -32,8 +32,28 @@ final class AppModel: ObservableObject {
         } catch { state = .failed("We couldn’t refresh your shared plans.") }
     }
 
+    func createPlan(name: String, description: String?, currency: String, memberEmails: [String] = []) async throws -> APIGroup {
+        let group = try await client.createGroup(
+            name: name,
+            description: description,
+            currency: currency
+        )
+
+        let normalizedEmails = memberEmails
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+
+        for email in normalizedEmails {
+            try? await client.invite(groupID: group.id, email: email)
+        }
+
+        await refresh()
+        return group
+    }
+
     func createGroup(name: String, description: String?, currency: String) async throws {
-        _ = try await client.createGroup(name: name, description: description, currency: currency); await refresh()
+        _ = try await client.createGroup(name: name, description: description, currency: currency)
+        await refresh()
     }
 
     func updateProfile(displayName: String, username: String?) async throws {

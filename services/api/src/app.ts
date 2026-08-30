@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
 import Fastify, { LogController } from "fastify";
 import type { Environment } from "./config/environment.js";
@@ -17,7 +18,7 @@ export async function createApp(environment: Environment) {
     }),
     logger: loggerOptions(environment),
     requestIdHeader: "x-request-id",
-    trustProxy: environment.nodeEnvironment === "production"
+    trustProxy: environment.trustedProxies
   });
 
   await app.register(helmet, {
@@ -28,6 +29,13 @@ export async function createApp(environment: Environment) {
     origin: environment.corsOrigins
   });
   await app.register(sensible);
+  await app.register(rateLimit, {
+    allowList: (request) =>
+      request.url === "/api/v1/health" || request.url === "/api/v1/ready",
+    global: true,
+    max: environment.rateLimitMax,
+    timeWindow: environment.rateLimitWindowMs
+  });
   registerDatabase(app, environment.databaseUrl);
 
   app.addHook("onSend", async (request, reply) => {
@@ -38,9 +46,11 @@ export async function createApp(environment: Environment) {
 
   await app.register(
     async (versionedApi) => {
-      await versionedApi.register(healthRoutes(async () => {
-        if (environment.nodeEnvironment !== "test") await app.db`SELECT 1`;
-      }));
+      await versionedApi.register(
+        healthRoutes(async () => {
+          if (environment.nodeEnvironment !== "test") await app.db`SELECT 1`;
+        })
+      );
       await versionedApi.register(coreRoutes(environment));
       await versionedApi.register(expenseRoutes);
     },

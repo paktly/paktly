@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Paktly PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=paktly-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -5,14 +5,18 @@
 The API builds from the repository root so workspace dependencies remain available:
 
 ```bash
-docker build -f services/api/Dockerfile -t pakt-api .
-docker run --rm --env-file .env pakt-api node scripts/migrate.mjs
-docker run --rm -p 4000:4000 --env-file .env pakt-api
+docker build -f services/api/Dockerfile -t paktly-api:local .
+docker run --rm --env-file .env paktly-api:local node scripts/migrate.mjs
+docker run --rm -p 4000:4000 --env-file .env paktly-api:local
 ```
 
 Run migrations as a one-off release task before shifting traffic. `/api/v1/health` checks process liveness; `/api/v1/ready` verifies PostgreSQL connectivity and should gate traffic.
 
 Production deployments must supply validated configuration through the platform secret manager. Images must not contain `.env` files.
+
+The Contabo/VPS deployment stack, reverse-proxy examples, backup timer, rollout, and rollback procedures are documented in [`infrastructure/production/README.md`](../infrastructure/production/README.md). The default stack binds the API only to loopback and does not publish PostgreSQL or Redis.
+
+Production authentication is a launch gate: the development session endpoint is disabled in production. SocketFi identity verification must be integrated from its production server-verification contract before authenticated users are admitted.
 
 ## Web
 

@@ -22,7 +22,7 @@ async function requireMember(app: FastifyInstance, groupId: string, userId: stri
 
 export function coreRoutes(environment: Environment): FastifyPluginAsync {
   return async (app) => {
-    app.post("/auth/dev-session", async (request) => {
+    app.post("/auth/dev-session", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
       if (environment.nodeEnvironment === "production") throw app.httpErrors.notFound();
       const body = parse(z.object({ email: z.string().email(), displayName: z.string().trim().min(1).max(80) }), request.body, app.httpErrors.badRequest);
       return createDevelopmentSession(app.db, body);

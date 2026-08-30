@@ -38,6 +38,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate
+      - name: Validate production deployment assets
+        env:
+          PAKTLY_ENV_FILE: ${{ github.workspace }}/infrastructure/production/env.example
+          PAKTLY_RELEASE: ci
+        run: |
+          bash -n scripts/deploy-production.sh scripts/rollback-production.sh scripts/backup-postgres.sh scripts/verify-production.sh
+          docker compose --env-file infrastructure/production/env.example -f infrastructure/production/compose.yml config --quiet
+          docker compose --env-file infrastructure/production/env.example -f infrastructure/production/compose.yml -f infrastructure/production/compose.caddy.yml config --quiet
+          docker build -f services/api/Dockerfile -t paktly-api:ci .
       - name: Migrate integration database
         run: pnpm --filter @pakt/api migrate
         env:

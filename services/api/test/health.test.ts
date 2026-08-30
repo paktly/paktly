@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
+import Fastify from "fastify";
 import { createApp } from "../src/app.js";
 import type { Environment } from "../src/config/environment.js";
+import { healthRoutes } from "../src/modules/health/routes.js";
 
 const testEnvironment: Environment = {
   apiHost: "127.0.0.1",
@@ -8,7 +10,10 @@ const testEnvironment: Environment = {
   corsOrigins: ["http://localhost:3000"],
   databaseUrl: "postgres://pakt:pakt_local_only@localhost:56432/pakt",
   logLevel: "silent",
-  nodeEnvironment: "test"
+  nodeEnvironment: "test",
+  rateLimitMax: 300,
+  rateLimitWindowMs: 60_000,
+  trustedProxies: ["loopback", "linklocal", "uniquelocal"]
 };
 
 const apps: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -57,6 +62,37 @@ describe("platform routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe("ok");
+  });
+
+  it("returns 503 readiness without leaking dependency errors", async () => {
+    const app = Fastify();
+    apps.push(app);
+    await app.register(
+      healthRoutes(() =>
+        Promise.reject(new Error("postgres://secret-password@database"))
+      )
+    );
+
+    const response = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      service: "paktly-api",
+      status: "unavailable"
+    });
+    expect(response.body).not.toContain("secret-password");
+  });
+
+  it("enforces the configured global rate limit", async () => {
+    const app = await createApp({ ...testEnvironment, rateLimitMax: 1 });
+    apps.push(app);
+    app.get("/test/rate-limit", () => ({ ok: true }));
+
+    const first = await app.inject({ method: "GET", url: "/test/rate-limit" });
+    const second = await app.inject({ method: "GET", url: "/test/rate-limit" });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(429);
   });
 
   it("returns safe client errors", async () => {

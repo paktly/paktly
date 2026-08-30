@@ -9,7 +9,10 @@ describe("loadEnvironment", () => {
       corsOrigins: ["http://localhost:3000"],
       databaseUrl: "postgres://pakt:pakt_local_only@localhost:56432/pakt",
       logLevel: "info",
-      nodeEnvironment: "development"
+      nodeEnvironment: "development",
+      rateLimitMax: 300,
+      rateLimitWindowMs: 60_000,
+      trustedProxies: ["loopback", "linklocal", "uniquelocal"]
     });
   });
 
@@ -30,5 +33,24 @@ describe("loadEnvironment", () => {
     expect(() => loadEnvironment({ CORS_ORIGINS: " , " })).toThrow(
       "CORS_ORIGINS is empty"
     );
+  });
+
+  it("requires explicit secure production connectivity", () => {
+    expect(() => loadEnvironment({ NODE_ENV: "production" })).toThrow(
+      "DATABASE_URL is required in production"
+    );
+    expect(() =>
+      loadEnvironment({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://user:pass@postgres/db"
+      })
+    ).toThrow("CORS_ORIGINS is required in production");
+    expect(() =>
+      loadEnvironment({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://user:pass@postgres/db",
+        CORS_ORIGINS: "http://paktly.io"
+      })
+    ).toThrow("must use HTTPS");
   });
 });

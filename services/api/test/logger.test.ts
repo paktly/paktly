@@ -8,7 +8,10 @@ const productionEnvironment: Environment = {
   corsOrigins: ["https://paktly.io"],
   databaseUrl: "postgres://pakt:pakt_local_only@localhost:56432/pakt",
   logLevel: "info",
-  nodeEnvironment: "production"
+  nodeEnvironment: "production",
+  rateLimitMax: 300,
+  rateLimitWindowMs: 60_000,
+  trustedProxies: ["loopback", "linklocal", "uniquelocal"]
 };
 
 describe("loggerOptions", () => {

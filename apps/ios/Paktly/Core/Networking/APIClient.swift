@@ -30,101 +30,459 @@ struct ExpenseDraft: Codable, Sendable {
     }
 }
 
+private struct DevelopmentSessionRequest: Encodable {
+    let email: String
+    let displayName: String
+}
+
+private struct DevelopmentSessionResponse: Decodable {
+    let accessToken: String
+    let user: APIUser
+}
+
+private struct ProfilePayload: Decodable {
+    let id: String
+    let email: String
+    let displayName: String
+}
+
+private struct ProfileResponse: Decodable {
+    let profile: ProfilePayload
+}
+
+private struct UpdateProfileRequest: Encodable {
+    let displayName: String
+}
+
+private struct UpdatedProfilePayload: Decodable {
+    let displayName: String
+}
+
+private struct UpdatedProfileResponse: Decodable {
+    let profile: UpdatedProfilePayload
+}
+
+private struct GroupsResponse: Decodable {
+    let groups: [APIGroup]
+}
+
+private struct GroupResponse: Decodable {
+    let group: APIGroup
+}
+
+private struct GroupDetailResponse: Decodable {
+    let group: APIGroup
+    let members: [APIGroupMember]
+}
+
+private struct CreateGroupRequest: Encodable {
+    let name: String
+    let description: String?
+    let defaultCurrency: String
+}
+
+private struct ExpensesResponse: Decodable {
+    let expenses: [APIExpense]
+}
+
+private struct ExpenseIdentifier: Decodable {
+    let id: String
+}
+
+private struct ExpenseResponse: Decodable {
+    let expense: ExpenseIdentifier
+}
+
+private struct UpdateExpenseRequest: Encodable {
+    let expectedVersion: Int
+    let description: String
+    let category: String
+    let amountMinor: Int
+    let currency: String
+    let paidBy: String
+    let expenseDate: Date
+    let notes: String?
+    let split: ExpenseDraft.Split
+    let exchangeRate: ExpenseDraft.ExchangeRate?
+}
+
+private struct BalancesResponse: Decodable {
+    let balances: [APIBalance]
+    let suggestedSettlements: [APISuggestedSettlement]
+}
+
+private struct ActivityResponse: Decodable {
+    let events: [APIActivity]
+}
+
+private struct NotificationsResponse: Decodable {
+    let notifications: [APINotification]
+}
+
+private struct NotificationResponse: Decodable {
+    let notification: APINotification
+}
+
+private struct EmptyRequest: Encodable {}
+
+private struct InvitationRequest: Encodable {
+    let email: String
+}
+
+private struct InvitationPayload: Decodable {
+    let id: String
+    let token: String?
+}
+
+private struct InvitationResponse: Decodable {
+    let invitation: InvitationPayload
+}
+
+private struct AcceptInvitationRequest: Encodable {
+    let token: String
+}
+
+private struct AcceptInvitationResponse: Decodable {
+    let groupId: String
+}
+
+private struct SettlementRequest: Encodable {
+    let fromUserId: String
+    let toUserId: String
+    let amountMinor: Int
+    let method = "MARKED_PAID"
+    let note: String? = nil
+    let clientOperationId = UUID().uuidString.lowercased()
+}
+
+private struct SettlementIdentifier: Decodable {
+    let id: String
+}
+
+private struct SettlementResponse: Decodable {
+    let settlement: SettlementIdentifier
+}
+
 actor APIClient {
     static let shared: APIClient = {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "PaktlyAPIBaseURL") as? String,
-              let url = URL(string: value), !value.isEmpty else {
+        guard
+            let value = Bundle.main.object(forInfoDictionaryKey: "PaktlyAPIBaseURL") as? String,
+            !value.isEmpty,
+            let url = URL(string: value)
+        else {
             fatalError("PaktlyAPIBaseURL must be configured for this build.")
         }
         return APIClient(baseURL: url)
     }()
+
     private let baseURL: URL
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
     init(baseURL: URL) {
         self.baseURL = baseURL
-        encoder = JSONEncoder(); encoder.keyEncodingStrategy = .convertToSnakeCase; encoder.dateEncodingStrategy = .iso8601
-        decoder = JSONDecoder(); decoder.keyDecodingStrategy = .convertFromSnakeCase; decoder.dateDecodingStrategy = .iso8601
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        self.encoder = encoder
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .iso8601
+        self.decoder = decoder
     }
 
     func developmentSignIn(email: String, displayName: String) async throws -> APIUser {
-        struct Body: Encodable { let email: String; let displayName: String }
-        struct Response: Decodable { let accessToken: String; let user: APIUser }
-        let response: Response = try await send("auth/dev-session", method: "POST", body: Body(email: email, displayName: displayName), authenticated: false)
+        let body = DevelopmentSessionRequest(email: email, displayName: displayName)
+        let response = try await send(
+            DevelopmentSessionResponse.self,
+            path: "auth/dev-session",
+            method: "POST",
+            body: body,
+            authenticated: false
+        )
         try KeychainTokenStore.save(response.accessToken)
         return response.user
     }
 
-    func groups() async throws -> [APIGroup] { struct R: Decodable { let groups: [APIGroup] }; return try await send("groups").groups }
-    func me() async throws -> APIUser { struct R: Decodable { let profile: Profile }; struct Profile: Decodable { let id: String; let email: String; let displayName: String }; let profile: Profile = try await send("me").profile; return APIUser(id: profile.id, email: profile.email, displayName: profile.displayName) }
-    func updateProfile(displayName: String) async throws { struct B: Encodable { let displayName: String }; struct R: Decodable { let profile: Profile }; struct Profile: Decodable { let displayName: String }; let _: R = try await send("me", method: "PATCH", body: B(displayName: displayName)) }
-    func createGroup(name: String, description: String?, currency: String) async throws -> APIGroup {
-        struct Body: Encodable { let name: String; let description: String?; let defaultCurrency: String }
-        struct R: Decodable { let group: APIGroup }
-        return try await send("groups", method: "POST", body: Body(name: name, description: description, defaultCurrency: currency)).group
+    func groups() async throws -> [APIGroup] {
+        let response = try await send(GroupsResponse.self, path: "groups")
+        return response.groups
     }
-    func group(_ id: String) async throws -> (APIGroup, [APIGroupMember]) { struct R: Decodable { let group: APIGroup; let members: [APIGroupMember] }; let r: R = try await send("groups/\(id)"); return (r.group, r.members) }
-    func expenses(groupID: String) async throws -> [APIExpense] { struct R: Decodable { let expenses: [APIExpense] }; return try await send("groups/\(groupID)/expenses").expenses }
-    func addExpense(groupID: String, draft: ExpenseDraft) async throws { struct R: Decodable { let expense: Created }; struct Created: Decodable { let id: String }; let _: R = try await send("groups/\(groupID)/expenses", method: "POST", body: draft) }
+
+    func me() async throws -> APIUser {
+        let response = try await send(ProfileResponse.self, path: "me")
+        return APIUser(
+            id: response.profile.id,
+            email: response.profile.email,
+            displayName: response.profile.displayName
+        )
+    }
+
+    func updateProfile(displayName: String) async throws {
+        let body = UpdateProfileRequest(displayName: displayName)
+        _ = try await send(
+            UpdatedProfileResponse.self,
+            path: "me",
+            method: "PATCH",
+            body: body
+        )
+    }
+
+    func createGroup(
+        name: String,
+        description: String?,
+        currency: String
+    ) async throws -> APIGroup {
+        let body = CreateGroupRequest(
+            name: name,
+            description: description,
+            defaultCurrency: currency
+        )
+        let response = try await send(
+            GroupResponse.self,
+            path: "groups",
+            method: "POST",
+            body: body
+        )
+        return response.group
+    }
+
+    func group(_ id: String) async throws -> (APIGroup, [APIGroupMember]) {
+        let response = try await send(GroupDetailResponse.self, path: "groups/\(id)")
+        return (response.group, response.members)
+    }
+
+    func expenses(groupID: String) async throws -> [APIExpense] {
+        let response = try await send(
+            ExpensesResponse.self,
+            path: "groups/\(groupID)/expenses"
+        )
+        return response.expenses
+    }
+
+    func addExpense(groupID: String, draft: ExpenseDraft) async throws {
+        _ = try await send(
+            ExpenseResponse.self,
+            path: "groups/\(groupID)/expenses",
+            method: "POST",
+            body: draft
+        )
+    }
+
     func updateExpense(id: String, expectedVersion: Int, draft: ExpenseDraft) async throws {
-        struct Body: Encodable {
-            let expectedVersion: Int; let description: String; let category: String; let amountMinor: Int; let currency: String
-            let paidBy: String; let expenseDate: Date; let notes: String?; let split: ExpenseDraft.Split
-            let exchangeRate: ExpenseDraft.ExchangeRate?
-        }
-        struct R: Decodable { let expense: Updated }; struct Updated: Decodable { let id: String }
-        let body = Body(expectedVersion: expectedVersion, description: draft.description, category: draft.category, amountMinor: draft.amountMinor, currency: draft.currency, paidBy: draft.paidBy, expenseDate: draft.expenseDate, notes: draft.notes, split: draft.split, exchangeRate: draft.exchangeRate)
-        let _: R = try await send("expenses/\(id)", method: "PATCH", body: body)
+        let body = UpdateExpenseRequest(
+            expectedVersion: expectedVersion,
+            description: draft.description,
+            category: draft.category,
+            amountMinor: draft.amountMinor,
+            currency: draft.currency,
+            paidBy: draft.paidBy,
+            expenseDate: draft.expenseDate,
+            notes: draft.notes,
+            split: draft.split,
+            exchangeRate: draft.exchangeRate
+        )
+        _ = try await send(
+            ExpenseResponse.self,
+            path: "expenses/\(id)",
+            method: "PATCH",
+            body: body
+        )
     }
-    func deleteExpense(id: String) async throws { let _: EmptyResponse = try await send("expenses/\(id)", method: "DELETE") }
-    func balances(groupID: String) async throws -> ([APIBalance], [APISuggestedSettlement]) { struct R: Decodable { let balances: [APIBalance]; let suggestedSettlements: [APISuggestedSettlement] }; let r: R = try await send("groups/\(groupID)/balances"); return (r.balances, r.suggestedSettlements) }
-    func activity(groupID: String) async throws -> [APIActivity] { struct R: Decodable { let events: [APIActivity] }; return try await send("groups/\(groupID)/activity").events }
-    func notifications() async throws -> [APINotification] { struct R: Decodable { let notifications: [APINotification] }; return try await send("notifications").notifications }
-    func markNotificationRead(id: String) async throws { struct R: Decodable { let notification: APINotification }; let _: R = try await send("notifications/\(id)/read", method: "POST", body: EmptyRequest()) }
-    func invite(groupID: String, email: String) async throws -> String? { struct B: Encodable { let email: String }; struct R: Decodable { let invitation: Invitation }; struct Invitation: Decodable { let id: String; let token: String? }; let response: R = try await send("groups/\(groupID)/invitations", method: "POST", body: B(email: email)); return response.invitation.token }
-    func acceptInvitation(token: String) async throws { struct B: Encodable { let token: String }; struct R: Decodable { let groupId: String }; let _: R = try await send("invitations/accept", method: "POST", body: B(token: token)) }
+
+    func deleteExpense(id: String) async throws {
+        try await sendWithoutResponse(path: "expenses/\(id)", method: "DELETE")
+    }
+
+    func balances(groupID: String) async throws -> ([APIBalance], [APISuggestedSettlement]) {
+        let response = try await send(
+            BalancesResponse.self,
+            path: "groups/\(groupID)/balances"
+        )
+        return (response.balances, response.suggestedSettlements)
+    }
+
+    func activity(groupID: String) async throws -> [APIActivity] {
+        let response = try await send(
+            ActivityResponse.self,
+            path: "groups/\(groupID)/activity"
+        )
+        return response.events
+    }
+
+    func notifications() async throws -> [APINotification] {
+        let response = try await send(NotificationsResponse.self, path: "notifications")
+        return response.notifications
+    }
+
+    func markNotificationRead(id: String) async throws {
+        _ = try await send(
+            NotificationResponse.self,
+            path: "notifications/\(id)/read",
+            method: "POST",
+            body: EmptyRequest()
+        )
+    }
+
+    func invite(groupID: String, email: String) async throws -> String? {
+        let response = try await send(
+            InvitationResponse.self,
+            path: "groups/\(groupID)/invitations",
+            method: "POST",
+            body: InvitationRequest(email: email)
+        )
+        return response.invitation.token
+    }
+
+    func acceptInvitation(token: String) async throws {
+        _ = try await send(
+            AcceptInvitationResponse.self,
+            path: "invitations/accept",
+            method: "POST",
+            body: AcceptInvitationRequest(token: token)
+        )
+    }
+
     func settle(groupID: String, from: String, to: String, amountMinor: Int) async throws {
-        struct B: Encodable { let fromUserId: String; let toUserId: String; let amountMinor: Int; let method = "MARKED_PAID"; let note: String? = nil; let clientOperationId = UUID().uuidString.lowercased() }
-        struct R: Decodable { let settlement: Settlement }; struct Settlement: Decodable { let id: String }
-        let _: R = try await send("groups/\(groupID)/settlements", method: "POST", body: B(fromUserId: from, toUserId: to, amountMinor: amountMinor))
+        let body = SettlementRequest(
+            fromUserId: from,
+            toUserId: to,
+            amountMinor: amountMinor
+        )
+        _ = try await send(
+            SettlementResponse.self,
+            path: "groups/\(groupID)/settlements",
+            method: "POST",
+            body: body
+        )
     }
 
-    private func send<Response: Decodable>(_ path: String, method: String = "GET", authenticated: Bool = true) async throws -> Response {
-        var request = URLRequest(url: baseURL.appending(path: path)); request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if authenticated, let token = KeychainTokenStore.load() { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? 0) }
-        if data.isEmpty, Response.self == EmptyResponse.self { return EmptyResponse() as! Response }
-        return try decoder.decode(Response.self, from: data)
+    private func send<Response: Decodable>(
+        _ responseType: Response.Type,
+        path: String,
+        method: String = "GET",
+        authenticated: Bool = true
+    ) async throws -> Response {
+        let request = makeRequest(
+            path: path,
+            method: method,
+            body: nil,
+            authenticated: authenticated
+        )
+        let data = try await perform(request)
+        return try decoder.decode(responseType, from: data)
     }
 
-    private func send<Response: Decodable, Body: Encodable>(_ path: String, method: String, body: Body, authenticated: Bool = true) async throws -> Response {
-        var request = URLRequest(url: baseURL.appending(path: path)); request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if authenticated, let token = KeychainTokenStore.load() { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        request.httpBody = try encoder.encode(body)
+    private func send<Response: Decodable, Body: Encodable>(
+        _ responseType: Response.Type,
+        path: String,
+        method: String,
+        body: Body,
+        authenticated: Bool = true
+    ) async throws -> Response {
+        let encodedBody = try encoder.encode(body)
+        let request = makeRequest(
+            path: path,
+            method: method,
+            body: encodedBody,
+            authenticated: authenticated
+        )
+        let data = try await perform(request)
+        return try decoder.decode(responseType, from: data)
+    }
+
+    private func sendWithoutResponse(
+        path: String,
+        method: String,
+        authenticated: Bool = true
+    ) async throws {
+        let request = makeRequest(
+            path: path,
+            method: method,
+            body: nil,
+            authenticated: authenticated
+        )
+        _ = try await perform(request)
+    }
+
+    private func makeRequest(
+        path: String,
+        method: String,
+        body: Data?,
+        authenticated: Bool
+    ) -> URLRequest {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if body != nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        if authenticated, let token = KeychainTokenStore.load() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = body
+        return request
+    }
+
+    private func perform(_ request: URLRequest) async throws -> Data {
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? 0) }
-        return try decoder.decode(Response.self, from: data)
+        guard
+            let httpResponse = response as? HTTPURLResponse,
+            (200..<300).contains(httpResponse.statusCode)
+        else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw APIError.requestFailed(statusCode)
+        }
+        return data
     }
 }
 
-private struct EmptyResponse: Decodable {}
-private struct EmptyRequest: Encodable {}
-enum APIError: Error { case requestFailed(Int); case secureStorage }
+enum APIError: Error {
+    case requestFailed(Int)
+    case secureStorage
+}
 
 enum KeychainTokenStore {
     private static let service = "io.paktly.app.session"
+
     static func save(_ token: String) throws {
-        let data = Data(token.utf8); SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: service] as CFDictionary)
-        let status = SecItemAdd([kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary, nil)
-        guard status == errSecSuccess else { throw APIError.secureStorage }
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service
+        ]
+        _ = SecItemDelete(query as CFDictionary)
+
+        var item = query
+        item[kSecValueData] = Data(token.utf8)
+        item[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(item as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw APIError.secureStorage
+        }
     }
+
     static func load() -> String? {
-        var item: CFTypeRef?; let status = SecItemCopyMatching([kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne] as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else { return nil }; return String(data: data, encoding: .utf8)
+        var result: CFTypeRef?
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne
+        ]
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
-    static func clear() { SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: service] as CFDictionary) }
+
+    static func clear() {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service
+        ]
+        _ = SecItemDelete(query as CFDictionary)
+    }
 }

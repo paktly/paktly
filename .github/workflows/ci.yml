@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    name: TypeScript quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: pakt
+          POSTGRES_USER: pakt
+          POSTGRES_PASSWORD: pakt_local_only
+        ports:
+          - 56432:5432
+        options: >-
+          --health-cmd "pg_isready -U pakt -d pakt"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate
+      - name: Migrate integration database
+        run: pnpm --filter @pakt/api migrate
+        env:
+          DATABASE_URL: postgres://pakt:pakt_local_only@localhost:56432/pakt
+      - name: Expense-sharing end-to-end tests
+        run: pnpm --filter @pakt/api test:integration
+        env:
+          TEST_DATABASE_URL: postgres://pakt:pakt_local_only@localhost:56432/pakt
+      - name: Lighthouse quality gate
+        run: pnpm --filter @pakt/web lighthouse
+
+  ios:
+    name: SwiftUI compile check
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Build and test without signing
+        working-directory: apps/ios
+        run: xcodebuild -project Paktly.xcodeproj -scheme Paktly -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO test

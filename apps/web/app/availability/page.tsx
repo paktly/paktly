@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { PageHero } from "../../components/page-hero";
+
+export const metadata: Metadata = { title: "Availability | Paktly", description: "Current Paktly availability, release stages, and regional limitations.", alternates: { canonical: "/availability" } };
+
+export default function AvailabilityPage() {
+  return <><PageHero eyebrow="AVAILABILITY" title="Prelaunch means prelaunch." description="Paktly is not currently available as a consumer financial service in any country. The public website and waitlist are product previews." /><section className="container availability-timeline"><article><span>NOW</span><h2>Website and waitlist</h2><p>Public product education and consented prelaunch updates. No account, deposit, payment, card, or investment functionality.</p></article><article><span>NEXT</span><h2>Shared-expense beta</h2><p>A controlled release focused on groups, shared plans, budgets, expenses, splits, balances, and settlement records without custody, with travel as the first complete workflow.</p></article><article><span>LATER</span><h2>Testnet and provider sandboxes</h2><p>Experimental Stellar, USDC, funding, and card flows available only to approved testers and clearly marked as non-production.</p></article><article><span>ONLY AFTER APPROVALS</span><h2>Limited real-money beta</h2><p>Specific countries and limits selected after legal review, provider contracts, KYC/AML design, security review, and operational readiness.</p></article></section><section className="container notice-panel"><h2>No geographic promise</h2><p>Joining the waitlist does not mean the product, a card, USDC functionality, or a particular provider will be available where you live. Supported regions and required disclosures will be published before invitations are issued.</p><Link href="/financial-disclosures">Read financial disclosures →</Link></section></>;
+}

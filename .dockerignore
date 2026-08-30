@@ -1,0 +1,12 @@
+.git
+.next
+**/.next
+**/dist
+**/node_modules
+coverage
+**/coverage
+DerivedData
+.build
+target
+.env*
+!.env.example

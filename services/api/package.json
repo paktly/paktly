@@ -1,0 +1,35 @@
+{
+  "name": "@pakt/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/server.ts",
+    "lint": "eslint src test",
+    "migrate": "node scripts/migrate.mjs",
+    "start": "node dist/server.js",
+    "test": "vitest run --coverage.enabled",
+    "test:integration": "vitest run test/mvp.integration.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.0",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/sensible": "6.0.5",
+    "@pakt/api-types": "workspace:*",
+    "fastify": "5.12.1",
+    "postgres": "3.4.9",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "tsx": "4.23.12",
+    "typescript": "catalog:",
+    "vitest": "4.1.11"
+  }
+}

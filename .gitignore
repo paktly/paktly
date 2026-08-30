@@ -1,0 +1,72 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+
+# JavaScript and web build output
+.next/
+out/
+dist/
+build/
+coverage/
+.nyc_output/
+.lighthouseci/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.cer
+*.crt
+*.jks
+secrets/
+
+# Logs, runtime state, and local data
+*.log
+*.pid
+*.pid.lock
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.backup
+tmp/
+temp/
+.cache/
+
+# Apple and Swift
+.DS_Store
+DerivedData/
+apps/ios/*.xcodeproj/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+xcuserdata/
+*.xcresult/
+.swiftpm/
+.build/
+
+# Rust
+target/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Infrastructure state
+.terraform/
+*.tfstate
+*.tfstate.*
+.serverless/

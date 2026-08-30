@@ -14,9 +14,39 @@ struct GroupDetailView: View {
                 ForEach(Array(suggestions.enumerated()), id: \.offset) { _, suggestion in Button("Record suggested settlement") { Task { try? await model.client.settle(groupID: groupID, from: suggestion.fromUserId, to: suggestion.toUserId, amountMinor: suggestion.amountMinor); await load() } } }
             }
             Section("Expenses") {
-                if expenses.isEmpty { Text("Nothing spent yet.").foregroundStyle(.secondary) }
-                ForEach(expenses) { expense in Button { editing = expense; showingExpense = true } label: { HStack { VStack(alignment: .leading) { Text(expense.description).foregroundStyle(.primary); Text("Paid by \(expense.payerName ?? "member") · \(expense.splitMethod.capitalized)").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text(Double(expense.originalAmountMinor) / 100, format: .currency(code: expense.originalCurrency)) } }
-                .onDelete { offsets in Task { for index in offsets { try? await model.client.deleteExpense(id: expenses[index].id) }; await load() } }
+                if expenses.isEmpty {
+                    Text("Nothing spent yet.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(expenses) { expense in
+                    Button {
+                        editing = expense
+                        showingExpense = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(expense.description)
+                                    .foregroundStyle(.primary)
+                                Text("Paid by \(expense.payerName ?? "member") · \(expense.splitMethod.capitalized)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(
+                                Double(expense.originalAmountMinor) / 100,
+                                format: .currency(code: expense.originalCurrency)
+                            )
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    Task {
+                        for index in offsets {
+                            try? await model.client.deleteExpense(id: expenses[index].id)
+                        }
+                        await load()
+                    }
+                }
             }
             Section("Members") { ForEach(members) { member in HStack { Text(member.displayName); Spacer(); Text(member.role.capitalized).font(.caption).foregroundStyle(.secondary) } }; Button("Invite member") { inviting = true } }
         }

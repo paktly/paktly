@@ -28,6 +28,8 @@ curl --fail https://api.paktly.io/api/v1/ready
 
 The deployment script builds an immutable image tagged with the Git commit, starts private dependencies, applies migrations, replaces the API container, checks readiness, and automatically restores the previous API image if verification fails.
 
+If port `4000` is already used by another application, set an unused loopback port in `/opt/paktly/.env`, for example `PAKTLY_HOST_API_PORT=4010`. The deployment verifier discovers the published port from Compose automatically. Point the host reverse proxy at that same port.
+
 ## Reverse proxy
 
 If the VPS already has Nginx, adapt `nginx-api.paktly.io.conf.example`, obtain the TLS certificate, validate with `sudo nginx -t`, and reload Nginx. Do not launch the included Caddy service because both proxies would compete for ports 80 and 443.

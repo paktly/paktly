@@ -34,8 +34,10 @@ done
 echo "Applying database migrations"
 "${compose[@]}" run --rm --no-deps api node scripts/migrate.mjs
 "${compose[@]}" up -d --no-deps api
+published_endpoint="$("${compose[@]}" port api 4000)"
+[[ -n "$published_endpoint" ]] || { echo "Could not determine the published API port" >&2; exit 1; }
 
-if ! "$repo_root/scripts/verify-production.sh"; then
+if ! PAKTLY_VERIFY_URL="http://$published_endpoint" "$repo_root/scripts/verify-production.sh"; then
   echo "Deployment verification failed" >&2
   if [[ -n "$previous_release" ]] && docker image inspect "$image_name:$previous_release" >/dev/null 2>&1; then
     echo "Rolling back application container to $previous_release"

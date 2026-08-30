@@ -8,6 +8,16 @@ struct ActivityView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Activity")
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundStyle(PaktlyColor.ink)
+                        Text("Trip feed + personal notifications")
+                            .font(.subheadline)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                    }
+                    .padding(.horizontal, 4)
+
                     activitySection
 
                     if !model.notifications.isEmpty {

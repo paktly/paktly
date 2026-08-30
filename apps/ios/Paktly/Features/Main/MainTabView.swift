@@ -15,6 +15,7 @@ struct MainTabView: View {
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
         }
+        .tint(PaktlyColor.forest)
         .task { await model.refresh() }
     }
 }

@@ -8,10 +8,17 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 if let userName = model.currentUser?.displayName {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Good afternoon, \(userName)")
-                            .font(.title.bold())
-                            .foregroundStyle(PaktlyColor.ink)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("Good afternoon,")
+                                .font(.subheadline)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            Text(userName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.ink)
+                        }
+
                         Text("Everything you share, in one place.")
+                            .font(.subheadline)
                             .foregroundStyle(PaktlyColor.secondaryInk)
                     }
                     .padding(.horizontal, 20)

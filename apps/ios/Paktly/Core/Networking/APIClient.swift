@@ -193,7 +193,6 @@ actor APIClient {
         self.baseURL = baseURL
 
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
         self.encoder = encoder
 

@@ -326,7 +326,7 @@ struct GroupDetailView: View {
                             )
                             await load()
                         } catch {
-                            error = "Could not record settlement."
+                            self.error = "Could not record settlement."
                         }
                     }
                 }
@@ -388,7 +388,7 @@ struct GroupDetailView: View {
                             try await model.client.deleteExpense(id: expense.id)
                             await load()
                         } catch {
-                            error = "Could not delete this expense."
+                            self.error = "Could not delete this expense."
                         }
                     }
                 }
@@ -466,7 +466,7 @@ struct GroupDetailView: View {
             balances = b.0
             suggestions = b.1
             events = try await activityData
-            error = nil
+            self.error = nil
         } catch {
             self.error = "We couldn’t load this plan."
         }

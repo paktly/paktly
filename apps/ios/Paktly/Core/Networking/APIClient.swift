@@ -22,7 +22,7 @@ struct APIExpense: Codable, Identifiable, Sendable {
     let groupCurrency: String; let paidBy: String; let expenseDate: Date; let notes: String?; let splitMethod: String; let payerName: String?
 }
 struct APIBalance: Codable, Identifiable, Sendable { let userId: String; let displayName: String; let netMinor: Int; var id: String { userId } }
-struct APISuggestedSettlement: Codable, Sendable { let fromUserId: String; let toUserId: String; let amountMinor: Int }
+struct APISuggestedSettlement: Codable, Identifiable, Sendable { let fromUserId: String; let toUserId: String; let amountMinor: Int; var id: String { fromUserId + ":\(toUserId):\(amountMinor)" } }
 struct APIActivity: Codable, Identifiable, Sendable { let id: String; let type: String; let summary: String; let createdAt: Date }
 struct APINotification: Codable, Identifiable, Sendable { let id: String; let title: String; let body: String; let readAt: Date?; let createdAt: Date }
 

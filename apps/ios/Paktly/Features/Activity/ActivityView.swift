@@ -7,16 +7,25 @@ struct ActivityView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Activity")
-                            .font(.largeTitle.weight(.bold))
-                            .foregroundStyle(PaktlyColor.ink)
-                        Text("Trip feed + personal notifications")
-                            .font(.subheadline)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
+                LazyVStack(spacing: 20) {
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Activity")
+                                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                                .foregroundStyle(PaktlyColor.ink)
+                            Text("What’s happening across your plans.")
+                                .font(.subheadline)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                        }
+                        Spacer()
+                        Button { Task { await load() } } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.forest)
+                                .frame(width: 44, height: 44)
+                                .background(PaktlyColor.surface, in: Circle())
+                        }
                     }
-                    .padding(.horizontal, 4)
 
                     activitySection
 
@@ -26,19 +35,12 @@ struct ActivityView: View {
 
                     Spacer(minLength: 20)
                 }
-                .padding(16)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
             }
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Activity")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await load() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .task { await load() }
             .refreshable { await load() }
         }
@@ -47,7 +49,7 @@ struct ActivityView: View {
     private var activitySection: some View {
         card {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader("Trip activity")
+                PaktlySectionHeader(title: "Recent")
 
                 if events.isEmpty {
                     contentUnavailable(
@@ -56,21 +58,22 @@ struct ActivityView: View {
                     )
                 } else {
                     ForEach(events) { event in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(event.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(PaktlyColor.ink)
-
-                            Text(event.createdAt, style: .relative)
-                                .font(.caption)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: activityIcon(event.type))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.forest)
+                                .frame(width: 38, height: 38)
+                                .background(PaktlyColor.mint.opacity(0.35), in: Circle())
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(event.summary).font(.subheadline.weight(.medium)).foregroundStyle(PaktlyColor.ink)
+                                Text(event.createdAt, style: .relative).font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 8)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Divider()
                 }
             }
         }
@@ -79,7 +82,7 @@ struct ActivityView: View {
     private var notificationsSection: some View {
         card {
             VStack(alignment: .leading, spacing: 12) {
-                sectionHeader("Notifications")
+                PaktlySectionHeader(title: "Notifications")
 
                 ForEach(model.notifications) { item in
                     Button {
@@ -119,10 +122,12 @@ struct ActivityView: View {
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.subheadline.bold())
-            .foregroundStyle(PaktlyColor.secondaryInk)
+    private func activityIcon(_ type: String) -> String {
+        let value = type.lowercased()
+        if value.contains("expense") { return "receipt" }
+        if value.contains("settle") { return "checkmark.circle" }
+        if value.contains("member") || value.contains("invite") { return "person.badge.plus" }
+        return "sparkles"
     }
 
     private func contentUnavailable(_ title: String, _ message: String) -> some View {

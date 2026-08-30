@@ -21,16 +21,8 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Profile")
-                            .font(.largeTitle.weight(.bold))
-                            .foregroundStyle(PaktlyColor.ink)
-                        Text("Manage your account and security")
-                            .font(.subheadline)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                    }
-                    .padding(.horizontal, 20)
+                VStack(spacing: 18) {
+                    profileHeader
 
                     PaktlyPanel {
                         VStack(spacing: 12) {
@@ -87,31 +79,40 @@ struct ProfileView: View {
 
                     PaktlyPanel {
                         if let smartAccount = model.currentUser?.smartAccount {
-                            Text("Smart account")
-                                .font(.headline)
-                            Text("Network")
-                                .font(.caption)
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack {
+                                    Label("Smart account", systemImage: "checkmark.shield.fill")
+                                        .font(.headline).foregroundStyle(PaktlyColor.ink)
+                                    Spacer()
+                                    PaktlyRowPill(text: smartAccount.network.capitalized)
+                                }
+                                Text(smartAccount.address)
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .foregroundStyle(PaktlyColor.secondaryInk)
+                                    .lineLimit(1).truncationMode(.middle)
+                                    .textSelection(.enabled)
+                            }
+                        } else {
+                            Label("Smart account is being prepared", systemImage: "hourglass")
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(PaktlyColor.secondaryInk)
-                            Text(smartAccount.network.capitalized)
-                            Divider()
-
-                            Text("Address")
-                                .font(.caption)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
-                            Text(smartAccount.address)
-                                .font(.system(.footnote, design: .monospaced))
-                                .textSelection(.enabled)
                         }
                     }
 
                     PaktlyPanel {
-                        Text("Security")
-                            .font(.headline)
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Passkey active", systemImage: "faceid")
-                            Label("Devices & sessions", systemImage: "laptopcomputer.and.iphone")
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("Security").font(.headline).foregroundStyle(PaktlyColor.ink)
+                            HStack(spacing: 12) {
+                                Image(systemName: "faceid")
+                                    .foregroundStyle(PaktlyColor.forest)
+                                    .frame(width: 38, height: 38)
+                                    .background(PaktlyColor.mint.opacity(0.35), in: Circle())
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Passkey protected").font(.subheadline.weight(.semibold))
+                                    Text("Your device securely authorizes access.").font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                                }
+                            }
                         }
-                        .foregroundStyle(PaktlyColor.secondaryInk)
                     }
 
                     PaktlyPanel {
@@ -121,12 +122,32 @@ struct ProfileView: View {
                         .font(.subheadline.weight(.semibold))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
             }
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Profile")
+            .navigationBarHidden(true)
             .task(id: model.currentUser?.id) { loadProfile() }
         }
+    }
+
+    private var profileHeader: some View {
+        VStack(spacing: 12) {
+            PaktlyAvatar(name: model.currentUser?.displayName ?? "Paktly user", size: 72)
+            VStack(spacing: 4) {
+                Text(model.currentUser?.displayName ?? "Your profile")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .foregroundStyle(PaktlyColor.ink)
+                if let username = model.currentUser?.username {
+                    Text("@\(username)").font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                } else {
+                    Text("Your identity and security").font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     private func loadProfile() {

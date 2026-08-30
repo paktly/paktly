@@ -8,20 +8,33 @@ struct GroupsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Shared plans")
-                                .font(.largeTitle.weight(.bold))
+                LazyVStack(spacing: 18) {
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Plans")
+                                .font(.system(.largeTitle, design: .rounded, weight: .bold))
                                 .foregroundStyle(PaktlyColor.ink)
-                            Text("\(model.groups.count) active plans")
-                                .font(.subheadline)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            Text("Trips, homes, events—anything shared.")
+                                .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
                         }
-                        Spacer()
+                        Spacer(minLength: 12)
+                        Button { joining = true } label: {
+                            Image(systemName: "person.badge.plus")
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.forest)
+                                .frame(width: 46, height: 46)
+                                .background(PaktlyColor.surface, in: Circle())
+                        }
+                        .accessibilityLabel("Join a plan")
+                        Button { creating = true } label: {
+                            Image(systemName: "plus")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(PaktlyColor.background)
+                                .frame(width: 46, height: 46)
+                                .background(PaktlyColor.forest, in: Circle())
+                        }
+                        .accessibilityLabel("New plan")
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
 
                     if model.groups.isEmpty {
                         PaktlyEmptyState(
@@ -32,19 +45,16 @@ struct GroupsView: View {
                     } else {
                         ForEach(model.groups) { group in
                             NavigationLink(value: group.id) {
-                                PaktlyPanel {
+                                PaktlyPanel(cornerRadius: 24, padding: 18) {
                                     HStack(alignment: .top, spacing: 14) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(PaktlyColor.forest.opacity(0.15))
-                                                .frame(width: 44, height: 44)
-                                            Image(systemName: "person.3.fill")
-                                                .foregroundStyle(PaktlyColor.forest)
-                                        }
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(indexColor(group.id))
+                                            .frame(width: 54, height: 54)
+                                            .overlay(Image(systemName: "person.2.fill").foregroundStyle(PaktlyColor.forest))
 
                                         VStack(alignment: .leading, spacing: 6) {
                                             Text(group.name)
-                                                .font(.headline)
+                                                .font(.title3.weight(.bold))
                                                 .foregroundStyle(PaktlyColor.ink)
                                             Text("\(group.memberCount ?? 1) members · \(group.defaultCurrency)")
                                                 .font(.caption)
@@ -56,6 +66,9 @@ struct GroupsView: View {
                                         }
 
                                         Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(PaktlyColor.secondaryInk.opacity(0.65))
                                     }
                                 }
                             }
@@ -63,22 +76,22 @@ struct GroupsView: View {
                         }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
             }
-            .padding(16)
-            .padding(.top, 4)
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Plans")
+            .navigationBarHidden(true)
             .navigationDestination(for: String.self) { GroupDetailView(groupID: $0) }
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("Join", systemImage: "person.badge.plus") { joining = true }
-                    Button("New plan", systemImage: "plus.circle.fill") { creating = true }
-                }
-            }
             .sheet(isPresented: $creating) { CreatePlanView() }
             .sheet(isPresented: $joining) { JoinGroupView() }
             .refreshable { await model.refresh() }
         }
+    }
+
+    private func indexColor(_ id: String) -> Color {
+        let colors = [PaktlyColor.mint.opacity(0.6), PaktlyColor.lavender.opacity(0.6), PaktlyColor.coral.opacity(0.3)]
+        return colors[abs(id.hashValue) % colors.count]
     }
 }
 

@@ -18,10 +18,10 @@ struct PaktlyPanel<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(PaktlyColor.surface)
-                    .shadow(color: Color.black.opacity(0.04), radius: 16, y: 6)
+                    .shadow(color: Color.black.opacity(0.045), radius: 18, y: 8)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.5), lineWidth: 0.5)
                     )
             )
     }
@@ -70,5 +70,69 @@ struct PaktlyEmptyState: View {
                         .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
                 )
         )
+    }
+}
+
+struct PaktlyAvatar: View {
+    let name: String
+    var size: CGFloat = 44
+
+    var body: some View {
+        Text(initials)
+            .font(.system(size: size * 0.34, weight: .bold, design: .rounded))
+            .foregroundStyle(PaktlyColor.forest)
+            .frame(width: size, height: size)
+            .background(PaktlyColor.mint, in: Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.7), lineWidth: 2))
+            .accessibilityLabel(name)
+    }
+
+    private var initials: String {
+        let words = name.split(separator: " ").prefix(2)
+        let value = words.compactMap(\.first).map(String.init).joined()
+        return value.isEmpty ? "P" : value.uppercased()
+    }
+}
+
+struct PaktlySectionHeader: View {
+    let title: String
+    var action: String? = nil
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(PaktlyColor.ink)
+            Spacer()
+            if let action {
+                Text(action)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(PaktlyColor.forest)
+            }
+        }
+    }
+}
+
+struct PaktlyStatusBanner: View {
+    let icon: String
+    let title: String
+    let message: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(PaktlyColor.ink)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.55), in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+                Text(message).font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(15)
+        .background(PaktlyColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }

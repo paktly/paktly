@@ -31,7 +31,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Paktly/Paktly.entitlements
       configs:
         Debug:
-          PAKTLY_API_BASE_URL: http://localhost:4000/api/v1
+          PAKTLY_API_BASE_URL: https://api.paktly.io/api/v1
+        Release:
+          PAKTLY_API_BASE_URL: https://api.paktly.io/api/v1
     scheme:
       testTargets:
         - PaktlyTests

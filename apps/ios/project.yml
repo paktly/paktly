@@ -18,22 +18,21 @@ targets:
     platform: iOS
     sources:
       - path: Paktly
+    info:
+      path: Paktly/Info.plist
+      properties:
+        CFBundleDisplayName: Paktly
+        PaktlyAPIBaseURL: https://api.paktly.io/api/v1
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.paktly.app
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Paktly
-        INFOPLIST_KEY_PaktlyAPIBaseURL: $(PAKTLY_API_BASE_URL)
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         CODE_SIGN_ENTITLEMENTS: Paktly/Paktly.entitlements
-      configs:
-        Debug:
-          PAKTLY_API_BASE_URL: https://api.paktly.io/api/v1
-        Release:
-          PAKTLY_API_BASE_URL: https://api.paktly.io/api/v1
     scheme:
       testTargets:
         - PaktlyTests

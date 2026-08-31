@@ -7,6 +7,8 @@ struct WelcomeView: View {
     @State private var challengeID: String?
     @State private var isRequesting = false
     @State private var localError: String?
+    @State private var unavailableProvider = ""
+    @State private var showingProviderNotice = false
 
     private var normalizedEmail: String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -16,31 +18,36 @@ struct WelcomeView: View {
         ZStack {
             PaktlyColor.background.ignoresSafeArea()
             Circle()
-                .fill(PaktlyColor.mint)
-                .frame(width: 420, height: 420)
-                .offset(x: 160, y: -330)
+                .fill(PaktlyColor.mint.opacity(0.72))
+                .frame(width: 380, height: 380)
+                .offset(x: 175, y: -350)
                 .accessibilityHidden(true)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Spacer(minLength: 80)
-                    Image(systemName: "person.3.fill")
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(PaktlyColor.forest)
-                        .padding(17)
-                        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    Spacer(minLength: 48)
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundStyle(PaktlyColor.forest)
+                            .frame(width: 42, height: 42)
+                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        Text("paktly")
+                            .font(.system(size: 25, weight: .bold, design: .rounded))
+                            .tracking(-0.5)
+                    }
 
                     Text("Plan together.\nSplit together.\nSave together.")
-                        .font(.system(size: 43, weight: .bold, design: .rounded))
-                        .tracking(-1.4)
+                        .font(.system(size: 39, weight: .bold, design: .rounded))
+                        .tracking(-1.1)
                         .minimumScaleFactor(0.75)
-                        .padding(.top, 26)
+                        .padding(.top, 24)
 
-                    Text("Start with planning and shared expenses. Activate financial features only when you need them.")
-                        .font(.title3)
+                    Text("One place for shared plans, expenses, and goals—with smarter money features when you need them.")
+                        .font(.body)
                         .foregroundStyle(PaktlyColor.secondaryInk)
-                        .lineSpacing(4)
-                        .padding(.top, 16)
+                        .lineSpacing(3)
+                        .padding(.top, 13)
 
                     VStack(spacing: 14) {
                         if let challengeID {
@@ -49,22 +56,47 @@ struct WelcomeView: View {
                             emailStep
                         }
                     }
-                    .padding(.top, 38)
+                    .padding(.top, 30)
 
-                    Text("No wallet or financial account is created during signup.")
-                        .font(.footnote)
+                    Text("By continuing, you agree to Paktly’s [Terms](https://paktly.io/terms) and acknowledge the [Privacy Policy](https://paktly.io/privacy).")
+                        .font(.caption)
                         .foregroundStyle(PaktlyColor.secondaryInk)
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 16)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 18)
+                        .padding(.bottom, 24)
                 }
                 .padding(24)
             }
         }
         .foregroundStyle(PaktlyColor.ink)
+        .alert("(unavailableProvider) sign-in", isPresented: $showingProviderNotice) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This option is being connected and will be available soon. Continue with email for now.")
+        }
     }
 
     private var emailStep: some View {
         VStack(spacing: 14) {
+            SocialAuthButton(title: "Continue with Apple", systemImage: "apple.logo", style: .dark) {
+                showUnavailable("Apple")
+            }
+
+            SocialAuthButton(title: "Continue with Google", lettermark: "G", style: .light) {
+                showUnavailable("Google")
+            }
+
+            HStack(spacing: 12) {
+                Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
+                Text("or continue with email")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
+            }
+            .padding(.vertical, 2)
+
             TextField("Email address", text: $email)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
@@ -72,6 +104,10 @@ struct WelcomeView: View {
                 .textContentType(.emailAddress)
                 .padding(16)
                 .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
+                }
 
             Button { Task { await requestCode() } } label: {
                 HStack {
@@ -81,24 +117,6 @@ struct WelcomeView: View {
             }
             .buttonStyle(PaktlyPrimaryButtonStyle())
             .disabled(isRequesting || !normalizedEmail.contains("@"))
-
-            HStack(spacing: 12) {
-                Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
-                Text("or").font(.footnote).foregroundStyle(PaktlyColor.secondaryInk)
-                Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
-            }
-
-            Button {
-                Task { await session.signInWithExistingPasskey() }
-            } label: {
-                Label(
-                    session.state == .authenticating ? "Opening passkey…" : "Sign in with an existing passkey",
-                    systemImage: "person.badge.key.fill"
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PaktlySecondaryButtonStyle())
-            .disabled(session.state == .authenticating)
             errorText
         }
     }
@@ -158,6 +176,57 @@ struct WelcomeView: View {
         } catch {
             localError = "We couldn’t send a code. Check your email and try again."
         }
+    }
+
+    private func showUnavailable(_ provider: String) {
+        unavailableProvider = provider
+        showingProviderNotice = true
+    }
+}
+
+private struct SocialAuthButton: View {
+    enum Style { case dark, light }
+
+    let title: String
+    var systemImage: String?
+    var lettermark: String?
+    let style: Style
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Text(title).font(.headline)
+                HStack {
+                    if let systemImage {
+                        Image(systemName: systemImage).font(.system(size: 19, weight: .semibold))
+                    } else if let lettermark {
+                        Text(lettermark).font(.system(size: 19, weight: .bold, design: .rounded))
+                    }
+                    Spacer()
+                    Text("Soon")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            (style == .dark ? Color.white.opacity(0.16) : PaktlyColor.mint.opacity(0.45)),
+                            in: Capsule()
+                        )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .foregroundStyle(style == .dark ? Color.white : PaktlyColor.ink)
+            .background(style == .dark ? Color.black : PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .overlay {
+                if style == .light {
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

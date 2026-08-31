@@ -62,24 +62,6 @@ final class AppSession: ObservableObject {
         }
     }
 
-    func signInWithExistingPasskey() async {
-        guard state != .authenticating else { return }
-        state = .authenticating
-        errorMessage = nil
-        do {
-            let smartSession = try await smartAccountService.authenticate(mode: .signIn, username: nil)
-            let user = try await apiClient.socketFiSignIn(
-                accessToken: smartSession.socketFiAccessToken,
-                displayName: nil
-            )
-            state = user.displayName == "Paktly member" ? .needsProfile : .signedIn
-        } catch {
-            errorMessage = (error as? any LocalizedError)?.errorDescription
-                ?? "We couldn’t sign in with that passkey. Please try again."
-            state = .failed
-        }
-    }
-
     func completeProfile(displayName: String, username: String?) async {
         state = .authenticating
         errorMessage = nil

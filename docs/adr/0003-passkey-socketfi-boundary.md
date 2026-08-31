@@ -5,7 +5,7 @@
 
 ## Decision
 
-An ordinary Paktly account is independent from a SocketFi smart account. Email OTP is the initial low-friction identity path and creates no wallet. A user explicitly activates Paktly Smart when stored-value features are needed; that transition uses SocketFi's native passkey flow and links the resulting wallet to the existing Paktly user. Existing wallet users retain passkey sign-in. Apple and Google can be added as Paktly identity providers without changing the wallet boundary.
+An ordinary Paktly account is independent from a SocketFi smart account. Email OTP is the initial active identity path and creates no wallet; Apple and Google occupy first-class onboarding positions while their integrations are completed. Passkey sign-in is not part of consumer onboarding. A user explicitly activates Paktly Smart when stored-value features are needed; that transition uses SocketFi's native passkey flow and links the resulting wallet to the existing Paktly user.
 
 Paktly uses SocketFi's registered native-app protocol and Apple's `AuthenticationServices` UI directly; it does not need to open hosted authentication. Hosted SocketFi remains available to other clients. SocketFi stays behind app-owned `SmartAccountService` interfaces. TripVault remains a distinct group contract.
 

@@ -16,7 +16,7 @@ Production deployments must supply validated configuration through the platform 
 
 The Contabo/VPS deployment stack, reverse-proxy examples, backup timer, rollout, and rollback procedures are documented in [`infrastructure/production/README.md`](../infrastructure/production/README.md). The default stack binds the API only to loopback and does not publish PostgreSQL or Redis.
 
-Production authentication is a launch gate: the development session endpoint is disabled in production. Email OTP uses the provider-neutral `SmtpEmailProvider` backed by Nodemailer and Zoho Mail or ZeptoMail SMTP. Enable it with `EMAIL_AUTH_ENABLED=true`, a high-entropy `EMAIL_OTP_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and a matching sender on a verified domain. Use a Zoho application-specific password when two-factor authentication is enabled. SocketFi verification remains required for passkey sign-in and Smart Wallet linking; never place SMTP or SocketFi credentials in the iOS app.
+Production authentication is a launch gate: the development session endpoint is disabled in production. Email OTP uses the provider-neutral `SmtpEmailProvider` backed by Nodemailer and Zoho Mail or ZeptoMail SMTP. Enable it with `EMAIL_AUTH_ENABLED=true`, a high-entropy `EMAIL_OTP_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and a matching sender on a verified domain. Use a Zoho application-specific password when two-factor authentication is enabled. SocketFi verification remains required for Smart Wallet linking; never place SMTP or SocketFi credentials in the iOS app.
 
 ## Web
 

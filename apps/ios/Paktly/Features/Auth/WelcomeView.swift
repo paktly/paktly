@@ -89,18 +89,22 @@ struct WelcomeView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .disabled(session.state == .authenticating)
 
-            GoogleSignInButton {
+            GoogleSignInButton(scheme: .light, style: .wide) {
                 Task { await session.signInWithGoogle() }
             }
             .frame(height: 54)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .disabled(session.state == .authenticating)
+            .accessibilityIdentifier("GoogleSignInButton")
+            .accessibilityHint("Signs in to Paktly using your Google Account")
 
             HStack(spacing: 12) {
                 Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
-                Text("or continue with email")
-                    .font(.caption.weight(.medium))
+                Text("OR")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
                     .foregroundStyle(PaktlyColor.secondaryInk)
+                    .fixedSize()
                 Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
             }
             .padding(.vertical, 2)

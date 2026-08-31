@@ -39,6 +39,17 @@ struct MainTabView: View {
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
         .task { await model.refresh() }
+        .sheet(
+            item: Binding(
+                get: { model.presentedInvitation },
+                set: { value in if value == nil { model.dismissInvitation() } }
+            )
+        ) { presented in
+            InvitationDecisionView(invitation: presented.invitation)
+                .environmentObject(model)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var tabBar: some View {
@@ -80,5 +91,90 @@ struct MainTabView: View {
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 4)
+    }
+}
+
+private struct InvitationDecisionView: View {
+    @EnvironmentObject private var model: AppModel
+    let invitation: APIInvitation
+    @State private var working = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 24) {
+                Image(systemName: "person.2.badge.plus")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(PaktlyColor.forest)
+                    .frame(width: 58, height: 58)
+                    .background(PaktlyColor.mint.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("You’re invited")
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .foregroundStyle(PaktlyColor.ink)
+                    Text("\(invitation.inviterName) invited you to join \(invitation.groupName).")
+                        .font(.body)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Expires \(invitation.expiresAt, style: .relative)")
+                        .font(.caption)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                }
+
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(PaktlyColor.coral)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 12) {
+                    Button("Decline", role: .destructive) {
+                        Task { await decide(accept: false) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+
+                    Button {
+                        Task { await decide(accept: true) }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if working { ProgressView().tint(PaktlyColor.background) }
+                            Text("Accept invitation")
+                        }
+                    }
+                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                }
+                .disabled(working)
+            }
+            .padding(24)
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .navigationTitle(invitation.groupName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Not now") { model.dismissInvitation() }
+                }
+            }
+        }
+    }
+
+    private func decide(accept: Bool) async {
+        guard !working else { return }
+        working = true
+        errorMessage = nil
+        do {
+            if accept {
+                try await model.acceptPresentedInvitation()
+            } else {
+                try await model.declinePresentedInvitation()
+            }
+        } catch {
+            errorMessage = "This invitation could not be updated. Please try again."
+            working = false
+        }
     }
 }

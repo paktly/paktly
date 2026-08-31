@@ -27,6 +27,10 @@ struct ActivityView: View {
                         }
                     }
 
+                    if !model.invitations.isEmpty {
+                        invitationsSection
+                    }
+
                     activitySection
 
                     if !model.notifications.isEmpty {
@@ -43,6 +47,43 @@ struct ActivityView: View {
             .navigationBarHidden(true)
             .task { await load() }
             .refreshable { await load() }
+        }
+    }
+
+    private var invitationsSection: some View {
+        card {
+            VStack(alignment: .leading, spacing: 12) {
+                PaktlySectionHeader(title: "Invitations")
+                ForEach(model.invitations) { invitation in
+                    Button { model.presentInvitation(invitation) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.badge.plus")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.forest)
+                                .frame(width: 40, height: 40)
+                                .background(PaktlyColor.mint.opacity(0.38), in: Circle())
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(invitation.groupName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(PaktlyColor.ink)
+                                Text("Invited by \(invitation.inviterName)")
+                                    .font(.caption)
+                                    .foregroundStyle(PaktlyColor.secondaryInk)
+                            }
+                            Spacer()
+                            Text("Review")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.forest)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                        }
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 

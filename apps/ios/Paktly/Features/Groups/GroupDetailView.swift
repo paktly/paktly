@@ -453,23 +453,28 @@ struct GroupDetailView: View {
 
     private func load() async {
         do {
-            async let details = model.client.group(groupID)
-            async let expenseList = model.client.expenses(groupID: groupID)
-            async let balanceData = model.client.balances(groupID: groupID)
-            async let activityData = model.client.activity(groupID: groupID)
-
-            let d = try await details
+            let d = try await model.client.group(groupID)
             group = d.0
             members = d.1
-            expenses = try await expenseList
-            let b = try await balanceData
-            balances = b.0
-            suggestions = b.1
-            events = try await activityData
             self.error = nil
         } catch {
             self.error = "We couldn’t load this plan."
+            return
         }
+
+        async let expenseList = model.client.expenses(groupID: groupID)
+        async let balanceData = model.client.balances(groupID: groupID)
+        async let activityData = model.client.activity(groupID: groupID)
+
+        expenses = (try? await expenseList) ?? []
+        if let b = try? await balanceData {
+            balances = b.0
+            suggestions = b.1
+        } else {
+            balances = []
+            suggestions = []
+        }
+        events = (try? await activityData) ?? []
     }
 
     private enum MetricTone {

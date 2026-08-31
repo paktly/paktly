@@ -25,6 +25,16 @@ struct APIBalance: Codable, Identifiable, Sendable { let userId: String; let dis
 struct APISuggestedSettlement: Codable, Identifiable, Sendable { let fromUserId: String; let toUserId: String; let amountMinor: Int; var id: String { fromUserId + ":\(toUserId):\(amountMinor)" } }
 struct APIActivity: Codable, Identifiable, Sendable { let id: String; let type: String; let summary: String; let createdAt: Date }
 struct APINotification: Codable, Identifiable, Sendable { let id: String; let title: String; let body: String; let readAt: Date?; let createdAt: Date }
+struct APIInvitation: Codable, Identifiable, Sendable, Equatable {
+    let id: String
+    let groupId: String
+    let email: String
+    let status: String
+    let expiresAt: Date
+    let createdAt: Date
+    let groupName: String
+    let inviterName: String
+}
 
 struct ExpenseDraft: Codable, Sendable {
     struct Weighted: Codable, Sendable { let userId: String; let value: Int }
@@ -183,6 +193,17 @@ private struct InvitationPayload: Decodable {
 private struct InvitationResponse: Decodable {
     let invitation: InvitationPayload
 }
+
+private struct PendingInvitationsResponse: Decodable {
+    let invitations: [APIInvitation]
+}
+
+private struct InvitationDetailResponse: Decodable {
+    let invitation: APIInvitation
+}
+
+private struct InvitationStatusPayload: Decodable { let id: String; let status: String }
+private struct InvitationStatusResponse: Decodable { let invitation: InvitationStatusPayload }
 
 private struct AcceptInvitationRequest: Encodable {
     let token: String
@@ -458,6 +479,39 @@ actor APIClient {
             body: InvitationRequest(identifier: identifier)
         )
         return response.invitation.token
+    }
+
+    func pendingInvitations() async throws -> [APIInvitation] {
+        let response = try await send(PendingInvitationsResponse.self, path: "invitations")
+        return response.invitations
+    }
+
+    func resolveInvitation(token: String) async throws -> APIInvitation {
+        let response = try await send(
+            InvitationDetailResponse.self,
+            path: "invitations/resolve",
+            method: "POST",
+            body: AcceptInvitationRequest(token: token)
+        )
+        return response.invitation
+    }
+
+    func acceptInvitation(id: String) async throws {
+        _ = try await send(
+            AcceptInvitationResponse.self,
+            path: "invitations/\(id)/accept",
+            method: "POST",
+            body: EmptyRequest()
+        )
+    }
+
+    func declineInvitation(id: String) async throws {
+        _ = try await send(
+            InvitationStatusResponse.self,
+            path: "invitations/\(id)/decline",
+            method: "POST",
+            body: EmptyRequest()
+        )
     }
 
     func acceptInvitation(token: String) async throws {

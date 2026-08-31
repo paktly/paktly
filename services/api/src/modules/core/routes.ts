@@ -25,6 +25,18 @@ async function requireMember(app: FastifyInstance, groupId: string, userId: stri
   return membership;
 }
 
+async function invitationForRecipient(app: FastifyInstance, invitationId: string, email: string) {
+  const [invitation] = await app.db`
+    SELECT i.id,i.group_id,i.email,i.status,i.expires_at,i.created_at,
+      g.name group_name,p.display_name inviter_name
+    FROM invitations i
+    JOIN groups g ON g.id=i.group_id
+    JOIN user_profiles p ON p.user_id=i.invited_by
+    WHERE i.id=${invitationId} AND i.email=${email}
+  `;
+  return invitation;
+}
+
 export function coreRoutes(environment: Environment): FastifyPluginAsync {
   return async (app) => {
     const emailProvider = environment.emailAuth?.smtp
@@ -334,21 +346,57 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         return reply.status(201).send({ invitation: { id: invitationId, email: invitationEmail, status: "PENDING", ...(environment.nodeEnvironment !== "production" ? { token: rawToken } : {}) } });
       });
 
+      authenticated.get("/invitations", async (request) => {
+        const invitations = await app.db`
+          SELECT i.id,i.group_id,i.email,i.status,i.expires_at,i.created_at,
+            g.name group_name,p.display_name inviter_name
+          FROM invitations i
+          JOIN groups g ON g.id=i.group_id
+          JOIN user_profiles p ON p.user_id=i.invited_by
+          WHERE i.email=${request.authenticatedUser!.email}
+            AND i.status='PENDING' AND i.expires_at>now() AND g.status='ACTIVE'
+          ORDER BY i.created_at DESC
+        `;
+        return { invitations };
+      });
+
+      authenticated.post("/invitations/resolve", async (request) => {
+        const { token } = parse(z.object({ token: z.string().min(10) }), request.body, app.httpErrors.badRequest);
+        const [record] = await app.db`SELECT id FROM invitations WHERE token_hash=${hashToken(token)}`;
+        if (!record) throw app.httpErrors.gone("This invitation is no longer valid.");
+        const invitation = await invitationForRecipient(app, String(record.id), request.authenticatedUser!.email);
+        if (!invitation) throw app.httpErrors.forbidden("This invitation belongs to a different email address.");
+        if (invitation.status !== "PENDING" || new Date(String(invitation.expires_at)) <= new Date()) {
+          throw app.httpErrors.gone("This invitation is no longer valid.");
+        }
+        return { invitation };
+      });
+
+      authenticated.post("/invitations/:invitationId/accept", async (request) => {
+        const { invitationId } = parse(z.object({ invitationId: uuid }), request.params, app.httpErrors.badRequest);
+        const invitation = await invitationForRecipient(app, invitationId, request.authenticatedUser!.email);
+        if (!invitation) throw app.httpErrors.notFound("Invitation not found.");
+        return acceptInvitation(app, invitationId, request.authenticatedUser!);
+      });
+
+      authenticated.post("/invitations/:invitationId/decline", async (request) => {
+        const { invitationId } = parse(z.object({ invitationId: uuid }), request.params, app.httpErrors.badRequest);
+        const [invitation] = await app.db`
+          UPDATE invitations SET status='DECLINED'
+          WHERE id=${invitationId} AND email=${request.authenticatedUser!.email}
+            AND status='PENDING' AND expires_at>now()
+          RETURNING id,group_id
+        `;
+        if (!invitation) throw app.httpErrors.gone("This invitation is no longer available.");
+        return { invitation: { id: String(invitation.id), status: "DECLINED" } };
+      });
+
       authenticated.post("/invitations/accept", async (request) => {
         const { token } = parse(z.object({ token: z.string().min(10) }), request.body, app.httpErrors.badRequest);
-        const user = request.authenticatedUser!;
-        return app.db.begin(async (tx) => {
-          const [invitation] = await tx`SELECT * FROM invitations WHERE token_hash=${hashToken(token)} FOR UPDATE`;
-          if (!invitation || invitation.status !== "PENDING" || new Date(String(invitation.expires_at)) <= new Date()) throw app.httpErrors.gone("This invitation is no longer valid.");
-          if (String(invitation.email) !== user.email) throw app.httpErrors.forbidden("This invitation belongs to a different email address.");
-          const [group] = await tx`SELECT default_currency,name FROM groups WHERE id=${String(invitation.group_id)}`;
-          await tx`INSERT INTO group_members(group_id,user_id,role) VALUES(${String(invitation.group_id)},${user.id},'MEMBER') ON CONFLICT(group_id,user_id) DO UPDATE SET status='ACTIVE',role='MEMBER'`;
-          await tx`INSERT INTO ledger_accounts(id,group_id,user_id,currency) VALUES(${randomUUID()},${String(invitation.group_id)},${user.id},${String(group?.default_currency)}) ON CONFLICT DO NOTHING`;
-          await tx`UPDATE invitations SET status='ACCEPTED',accepted_by=${user.id},accepted_at=now() WHERE id=${String(invitation.id)}`;
-          await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${String(invitation.group_id)},${user.id},'MEMBER_JOINED','MEMBER',${user.id},${`${user.displayName} joined ${String(group?.name)}`})`;
-          await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) SELECT gen_random_uuid(),user_id,${String(invitation.group_id)},'MEMBER_JOINED','A member joined',${`${user.displayName} joined ${String(group?.name)}`},'MEMBER',${user.id} FROM group_members WHERE group_id=${String(invitation.group_id)} AND status='ACTIVE' AND user_id<>${user.id}`;
-          return { groupId: String(invitation.group_id), status: "ACCEPTED" };
-        });
+        const [invitation] = await app.db`SELECT id,email FROM invitations WHERE token_hash=${hashToken(token)}`;
+        if (!invitation) throw app.httpErrors.gone("This invitation is no longer valid.");
+        if (String(invitation.email) !== request.authenticatedUser!.email) throw app.httpErrors.forbidden("This invitation belongs to a different email address.");
+        return acceptInvitation(app, String(invitation.id), request.authenticatedUser!);
       });
 
       authenticated.get("/groups/:groupId/activity", async (request) => {
@@ -369,4 +417,26 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
     });
     await Promise.resolve();
   };
+}
+
+async function acceptInvitation(
+  app: FastifyInstance,
+  invitationId: string,
+  user: { id: string; email: string; displayName: string }
+) {
+  return app.db.begin(async (tx) => {
+    const [invitation] = await tx`SELECT * FROM invitations WHERE id=${invitationId} FOR UPDATE`;
+    if (!invitation || invitation.status !== "PENDING" || new Date(String(invitation.expires_at)) <= new Date()) {
+      throw app.httpErrors.gone("This invitation is no longer valid.");
+    }
+    if (String(invitation.email) !== user.email) throw app.httpErrors.forbidden("This invitation belongs to a different email address.");
+    const [group] = await tx`SELECT default_currency,name FROM groups WHERE id=${String(invitation.group_id)} AND status='ACTIVE'`;
+    if (!group) throw app.httpErrors.gone("This plan is no longer available.");
+    await tx`INSERT INTO group_members(group_id,user_id,role) VALUES(${String(invitation.group_id)},${user.id},'MEMBER') ON CONFLICT(group_id,user_id) DO UPDATE SET status='ACTIVE',role='MEMBER'`;
+    await tx`INSERT INTO ledger_accounts(id,group_id,user_id,currency) VALUES(${randomUUID()},${String(invitation.group_id)},${user.id},${String(group.default_currency)}) ON CONFLICT DO NOTHING`;
+    await tx`UPDATE invitations SET status='ACCEPTED',accepted_by=${user.id},accepted_at=now() WHERE id=${invitationId}`;
+    await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${String(invitation.group_id)},${user.id},'MEMBER_JOINED','MEMBER',${user.id},${`${user.displayName} joined ${String(group.name)}`})`;
+    await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) SELECT gen_random_uuid(),user_id,${String(invitation.group_id)},'MEMBER_JOINED','A member joined',${`${user.displayName} joined ${String(group.name)}`},'MEMBER',${user.id} FROM group_members WHERE group_id=${String(invitation.group_id)} AND status='ACTIVE' AND user_id<>${user.id}`;
+    return { groupId: String(invitation.group_id), status: "ACCEPTED" };
+  });
 }

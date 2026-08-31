@@ -5,11 +5,19 @@ struct PlanInvitationFailure: Error {
     let failedIdentifiers: [String]
 }
 
+struct PresentedInvitation: Identifiable, Equatable {
+    let invitation: APIInvitation
+    var id: String { invitation.id }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     enum LoadState: Equatable { case idle, loading, loaded, failed(String) }
     @Published private(set) var groups: [APIGroup] = []
     @Published private(set) var notifications: [APINotification] = []
+    @Published private(set) var invitations: [APIInvitation] = []
+    @Published private(set) var presentedInvitation: PresentedInvitation?
+    @Published private(set) var invitationError: String?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -26,16 +34,17 @@ final class AppModel: ObservableObject {
         _ = await offlineQueue.synchronize(using: client)
         do {
             async let groups = client.groups(); async let notifications = client.notifications(); async let user = client.me()
+            async let invitations = client.pendingInvitations()
             self.groups = try await groups; self.notifications = try await notifications; currentUser = try await user
+            self.invitations = try await invitations
             if let invitationToken = PendingInvitationStore.load() {
                 do {
-                    try await client.acceptInvitation(token: invitationToken)
-                    PendingInvitationStore.clear()
-                    self.groups = try await client.groups()
-                    self.notifications = try await client.notifications()
+                    let invitation = try await client.resolveInvitation(token: invitationToken)
+                    presentedInvitation = PresentedInvitation(invitation: invitation)
+                    invitationError = nil
                 } catch {
-                    state = .failed("Sign in with the email address that received the invitation, or request a new link.")
-                    return
+                    PendingInvitationStore.clear()
+                    invitationError = "This invitation is unavailable or belongs to a different email address."
                 }
             }
             if let first = self.groups.first, let balanceData = try? await client.balances(groupID: first.id) {
@@ -58,6 +67,32 @@ final class AppModel: ObservableObject {
         if KeychainTokenStore.load() != nil {
             Task { await refresh() }
         }
+    }
+
+    func presentInvitation(_ invitation: APIInvitation) {
+        invitationError = nil
+        presentedInvitation = PresentedInvitation(invitation: invitation)
+    }
+
+    func dismissInvitation() {
+        presentedInvitation = nil
+        PendingInvitationStore.clear()
+    }
+
+    func acceptPresentedInvitation() async throws {
+        guard let invitation = presentedInvitation?.invitation else { return }
+        try await client.acceptInvitation(id: invitation.id)
+        presentedInvitation = nil
+        PendingInvitationStore.clear()
+        await refresh()
+    }
+
+    func declinePresentedInvitation() async throws {
+        guard let invitation = presentedInvitation?.invitation else { return }
+        try await client.declineInvitation(id: invitation.id)
+        presentedInvitation = nil
+        PendingInvitationStore.clear()
+        await refresh()
     }
 
     func createPlan(name: String, description: String?, currency: String, memberIdentifiers: [String] = []) async throws -> APIGroup {

@@ -15,7 +15,7 @@ suite("expense-sharing MVP end to end", () => {
   beforeAll(async () => {
     app = await createApp(environment);
     await app.db.unsafe("TRUNCATE users CASCADE");
-    for (const name of ["alice", "bob", "charlie"]) {
+    for (const name of ["alice", "bob", "charlie", "dave"]) {
       const response = await app.inject({ method: "POST", url: "/api/v1/auth/dev-session", payload: { email: `${name}@example.com`, displayName: name[0]!.toUpperCase() + name.slice(1) } });
       expect(response.statusCode).toBe(200);
       const data = response.json(); sessions.set(name, { token: data.accessToken, id: data.user.id });
@@ -42,9 +42,21 @@ suite("expense-sharing MVP end to end", () => {
       const invited = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { identifier } });
       expect(invited.statusCode).toBe(201);
       expect(invited.json().invitation.email).toBe(`${name}@example.com`);
+      const inbox = await app.inject({ method: "GET", url: "/api/v1/invitations", headers: auth(name) });
+      expect(inbox.statusCode).toBe(200);
+      expect(inbox.json().invitations).toHaveLength(1);
+      const resolved = await app.inject({ method: "POST", url: "/api/v1/invitations/resolve", headers: auth(name), payload: { token: invited.json().invitation.token } });
+      expect(resolved.json().invitation.group_name).toBe("Shared summer");
       const accepted = await app.inject({ method: "POST", url: "/api/v1/invitations/accept", headers: auth(name), payload: { token: invited.json().invitation.token } });
       expect(accepted.statusCode).toBe(200);
     }
+    const daveInvite = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { identifier: "dave@example.com" } });
+    expect(daveInvite.statusCode).toBe(201);
+    const declined = await app.inject({ method: "POST", url: `/api/v1/invitations/${daveInvite.json().invitation.id}/decline`, headers: auth("dave") });
+    expect(declined.statusCode).toBe(200);
+    expect(declined.json().invitation.status).toBe("DECLINED");
+    const emptyInbox = await app.inject({ method: "GET", url: "/api/v1/invitations", headers: auth("dave") });
+    expect(emptyInbox.json().invitations).toHaveLength(0);
     const detail = await app.inject({ method: "GET", url: `/api/v1/groups/${groupId}`, headers: auth("alice") });
     expect(detail.json().members).toHaveLength(3);
   });

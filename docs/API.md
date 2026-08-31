@@ -28,7 +28,11 @@ Core routes:
 - `GET/POST /groups`
 - `GET /groups/:groupId`
 - `POST /groups/:groupId/invitations`
+- `GET /invitations`
+- `POST /invitations/resolve`
 - `POST /invitations/accept`
+- `POST /invitations/:invitationId/accept`
+- `POST /invitations/:invitationId/decline`
 - `GET/POST /groups/:groupId/expenses`
 - `GET/PATCH/DELETE /expenses/:expenseId`
 - `GET /groups/:groupId/balances`
@@ -53,3 +57,9 @@ Invitation acceptance is deliberately email-bound. The account accepting the
 token must be signed in with the same normalized email address that received the
 invitation. Acceptance is transactional and creates membership, the member's
 ledger account, activity history, and member notifications exactly once.
+
+Authenticated users can always retrieve pending, unexpired invitations through
+`GET /invitations`, even if they never open the email. `POST /invitations/resolve`
+turns a deep-link token into the same invitation preview. Both inbox and deep-link
+flows require an explicit accept or decline decision; resolving a link never joins
+the plan automatically.

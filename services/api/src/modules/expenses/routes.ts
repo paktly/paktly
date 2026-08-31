@@ -114,7 +114,14 @@ export const expenseRoutes: FastifyPluginAsync = async (app) => {
       FROM expenses e JOIN expense_versions v ON v.expense_id=e.id AND v.version=e.current_version
       JOIN user_profiles p ON p.user_id=v.paid_by WHERE e.group_id=${groupId} AND e.status='ACTIVE' ORDER BY v.expense_date DESC
     `;
-    return { expenses };
+    return {
+      expenses: expenses.map((expense) => ({
+        ...expense,
+        current_version: Number(expense.current_version),
+        original_amount_minor: Number(expense.original_amount_minor),
+        converted_amount_minor: Number(expense.converted_amount_minor)
+      }))
+    };
   });
 
   app.get("/expenses/:expenseId", async (request) => {

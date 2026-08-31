@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: { type: "website", title: "Paktly — Plan together. Fund together. Make it happen.", description: "One place for shared plans, shared goals, and shared money.", url: "/", siteName: "Paktly" },
   twitter: { card: "summary_large_image", title: "Paktly — Plan together. Fund together. Make it happen.", description: "One place for shared plans, shared goals, and shared money." },
-  icons: { icon: "/icon.svg" },
+  icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
   manifest: "/manifest.webmanifest"
 };
 

@@ -8,7 +8,7 @@ function Mark({ size: markSize }: { size: number }) {
   return <svg width={markSize} height={markSize} viewBox="0 0 128 128">
     <path d="M43 33C59 16 88 22 96 49" fill="none" stroke="#214C3A" strokeWidth="25" strokeLinecap="round" />
     <path d="M96 70C89 96 59 107 38 90" fill="none" stroke="#FF816F" strokeWidth="25" strokeLinecap="round" />
-    <path d="M31 105V83C18 61 29 35 51 28" fill="none" stroke="#BFF1D3" strokeWidth="25" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M31 105V83C18 61 29 35 51 28" fill="none" stroke="#3F9D6D" strokeWidth="25" strokeLinecap="round" strokeLinejoin="round" />
   </svg>;
 }
 

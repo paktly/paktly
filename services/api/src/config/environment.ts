@@ -25,7 +25,11 @@ const environmentSchema = z.object({
   SOCKETFI_NETWORK: z.enum(["TESTNET", "PUBLIC"]).default("TESTNET"),
   EMAIL_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   EMAIL_OTP_SECRET: z.string().min(32).optional(),
-  RESEND_API_KEY: z.string().min(10).optional(),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(465),
+  SMTP_SECURE: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
+  SMTP_USERNAME: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
   EMAIL_FROM: z.string().default("Paktly <hello@paktly.io>"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
@@ -51,8 +55,14 @@ export type Environment = {
   emailAuth?: {
     enabled: boolean;
     otpSecret?: string;
-    resendApiKey?: string;
     from: string;
+    smtp?: {
+      host: string;
+      port: number;
+      secure: boolean;
+      username: string;
+      password: string;
+    };
   };
 };
 
@@ -97,11 +107,17 @@ export function loadEnvironment(
         "Invalid environment configuration: SOCKETFI_CLIENT_ID and SOCKETFI_CLIENT_SECRET are required in production"
       );
     }
-    if (parsed.data.EMAIL_AUTH_ENABLED && (!source.EMAIL_OTP_SECRET || !source.RESEND_API_KEY)) {
-      throw new Error(
-        "Invalid environment configuration: EMAIL_OTP_SECRET and RESEND_API_KEY are required when email authentication is enabled"
-      );
-    }
+  }
+
+  if (parsed.data.EMAIL_AUTH_ENABLED && (
+    !source.EMAIL_OTP_SECRET ||
+    !source.SMTP_HOST ||
+    !source.SMTP_USERNAME ||
+    !source.SMTP_PASSWORD
+  )) {
+    throw new Error(
+      "Invalid environment configuration: EMAIL_OTP_SECRET, SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD are required when email authentication is enabled"
+    );
   }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
@@ -132,8 +148,18 @@ export function loadEnvironment(
     emailAuth: {
       enabled: parsed.data.EMAIL_AUTH_ENABLED,
       ...(parsed.data.EMAIL_OTP_SECRET ? { otpSecret: parsed.data.EMAIL_OTP_SECRET } : {}),
-      ...(parsed.data.RESEND_API_KEY ? { resendApiKey: parsed.data.RESEND_API_KEY } : {}),
-      from: parsed.data.EMAIL_FROM
+      from: parsed.data.EMAIL_FROM,
+      ...(parsed.data.SMTP_HOST && parsed.data.SMTP_USERNAME && parsed.data.SMTP_PASSWORD
+        ? {
+            smtp: {
+              host: parsed.data.SMTP_HOST,
+              port: parsed.data.SMTP_PORT,
+              secure: parsed.data.SMTP_SECURE,
+              username: parsed.data.SMTP_USERNAME,
+              password: parsed.data.SMTP_PASSWORD
+            }
+          }
+        : {})
     }
   };
 }

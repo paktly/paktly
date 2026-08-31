@@ -2,6 +2,7 @@ import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 import type { Sql } from "postgres";
 import type { Environment } from "../../config/environment.js";
 import { hashToken } from "./authentication.js";
+import type { EmailProvider } from "./email-provider.js";
 
 const OTP_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -12,34 +13,12 @@ function otpHash(challengeId: string, email: string, code: string, secret: strin
     .digest("hex");
 }
 
-async function deliverCode(
-  email: string,
-  code: string,
-  configuration: NonNullable<Environment["emailAuth"]>
-): Promise<void> {
-  if (!configuration.resendApiKey) throw new Error("Email delivery is not configured.");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${configuration.resendApiKey}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      from: configuration.from,
-      to: [email],
-      subject: `${code} is your Paktly code`,
-      text: `Your Paktly verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not request this code, you can ignore this email.`
-    }),
-    signal: AbortSignal.timeout(8_000)
-  });
-  if (!response.ok) throw new Error("Email delivery failed.");
-}
-
 export async function requestEmailOtp(
   database: Sql,
   email: string,
   configuration: NonNullable<Environment["emailAuth"]>,
-  nodeEnvironment: Environment["nodeEnvironment"]
+  nodeEnvironment: Environment["nodeEnvironment"],
+  emailProvider?: EmailProvider
 ) {
   if (!configuration.enabled || !configuration.otpSecret) throw new Error("EMAIL_AUTH_DISABLED");
   const normalizedEmail = email.trim().toLowerCase();
@@ -68,7 +47,12 @@ export async function requestEmailOtp(
     return { challengeId, expiresAt: expiresAt.toISOString(), developmentCode: code };
   }
   try {
-    await deliverCode(normalizedEmail, code, configuration);
+    if (!emailProvider) throw new Error("Email delivery is not configured.");
+    await emailProvider.sendAuthenticationCode({
+      recipient: normalizedEmail,
+      code,
+      expiresInMinutes: OTP_TTL_MINUTES
+    });
   } catch (error) {
     await database`
       UPDATE email_otp_challenges SET consumed_at=now()

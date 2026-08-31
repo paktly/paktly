@@ -4,6 +4,7 @@ import { z, type ZodType } from "zod";
 import type { Environment } from "../../config/environment.js";
 import { createDevelopmentSession, createSocketFiSession, hashToken, linkSocketFiIdentity, requireAuthentication } from "../auth/authentication.js";
 import { requestEmailOtp, verifyEmailOtp } from "../auth/email-otp.js";
+import { SmtpEmailProvider } from "../auth/email-provider.js";
 import { verifySocketFiToken } from "../auth/socketfi.js";
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
@@ -24,6 +25,9 @@ async function requireMember(app: FastifyInstance, groupId: string, userId: stri
 
 export function coreRoutes(environment: Environment): FastifyPluginAsync {
   return async (app) => {
+    const emailProvider = environment.emailAuth?.smtp
+      ? new SmtpEmailProvider({ ...environment.emailAuth.smtp, from: environment.emailAuth.from })
+      : undefined;
     app.post("/auth/dev-session", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
       if (environment.nodeEnvironment === "production") throw app.httpErrors.notFound();
       const body = parse(z.object({ email: z.string().email(), displayName: z.string().trim().min(1).max(80) }), request.body, app.httpErrors.badRequest);
@@ -37,7 +41,13 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         app.httpErrors.badRequest
       );
       try {
-        const result = await requestEmailOtp(app.db, email, environment.emailAuth ?? { enabled: false, from: "" }, environment.nodeEnvironment);
+        const result = await requestEmailOtp(
+          app.db,
+          email,
+          environment.emailAuth ?? { enabled: false, from: "" },
+          environment.nodeEnvironment,
+          emailProvider
+        );
         return reply.status(201).send({ delivery: "email", ...result });
       } catch (error) {
         if ((error as Error).message === "EMAIL_AUTH_DISABLED") throw app.httpErrors.serviceUnavailable("Email sign-in is not available.");

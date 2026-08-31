@@ -66,14 +66,32 @@ describe("loadEnvironment", () => {
     ).toThrow("must use HTTPS");
   });
 
-  it("requires OTP and delivery secrets only when production email auth is enabled", () => {
+  it("requires OTP and SMTP secrets whenever email auth is enabled", () => {
     expect(() => loadEnvironment({
-      NODE_ENV: "production",
-      DATABASE_URL: "postgres://user:pass@postgres/db",
-      CORS_ORIGINS: "https://paktly.io",
-      SOCKETFI_CLIENT_ID: "paktly-client",
-      SOCKETFI_CLIENT_SECRET: "a-secure-socketfi-secret",
       EMAIL_AUTH_ENABLED: "true"
-    })).toThrow("EMAIL_OTP_SECRET and RESEND_API_KEY");
+    })).toThrow("EMAIL_OTP_SECRET, SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD");
+  });
+
+  it("loads a secure SMTP email transport", () => {
+    expect(loadEnvironment({
+      EMAIL_AUTH_ENABLED: "true",
+      EMAIL_OTP_SECRET: "a".repeat(32),
+      SMTP_HOST: "smtppro.zoho.com",
+      SMTP_PORT: "465",
+      SMTP_SECURE: "true",
+      SMTP_USERNAME: "hello@paktly.io",
+      SMTP_PASSWORD: "app-specific-password"
+    }).emailAuth).toEqual({
+      enabled: true,
+      otpSecret: "a".repeat(32),
+      from: "Paktly <hello@paktly.io>",
+      smtp: {
+        host: "smtppro.zoho.com",
+        port: 465,
+        secure: true,
+        username: "hello@paktly.io",
+        password: "app-specific-password"
+      }
+    });
   });
 });

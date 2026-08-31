@@ -154,8 +154,7 @@ struct WelcomeView: View {
         localError = nil
         defer { isRequesting = false }
         do {
-            let result = try await session.requestEmailCode(normalizedEmail)
-            challengeID = result.0
+            challengeID = try await session.requestEmailCode(normalizedEmail)
         } catch {
             localError = "We couldn’t send a code. Check your email and try again."
         }

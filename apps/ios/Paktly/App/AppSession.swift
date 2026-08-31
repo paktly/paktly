@@ -40,7 +40,7 @@ final class AppSession: ObservableObject {
         }
     }
 
-    func requestEmailCode(_ email: String) async throws -> (String, Date) {
+    func requestEmailCode(_ email: String) async throws -> String {
         errorMessage = nil
         return try await apiClient.requestEmailOTP(email: email)
     }

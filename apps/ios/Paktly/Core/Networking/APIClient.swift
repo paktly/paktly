@@ -63,7 +63,7 @@ private struct SocketFiSessionResponse: Decodable {
 }
 
 private struct EmailOTPRequest: Encodable { let email: String }
-private struct EmailOTPChallengeResponse: Decodable { let challengeId: String; let expiresAt: Date }
+private struct EmailOTPChallengeResponse: Decodable { let challengeId: String }
 private struct EmailOTPVerifyRequest: Encodable { let challengeId: String; let email: String; let code: String }
 private struct EmailOTPSessionResponse: Decodable {
     let accessToken: String
@@ -253,7 +253,7 @@ actor APIClient {
         return response.user
     }
 
-    func requestEmailOTP(email: String) async throws -> (challengeId: String, expiresAt: Date) {
+    func requestEmailOTP(email: String) async throws -> String {
         let response = try await send(
             EmailOTPChallengeResponse.self,
             path: "auth/email/request",
@@ -261,7 +261,7 @@ actor APIClient {
             body: EmailOTPRequest(email: email),
             authenticated: false
         )
-        return (response.challengeId, response.expiresAt)
+        return response.challengeId
     }
 
     func verifyEmailOTP(challengeId: String, email: String, code: String) async throws -> (APIUser, Bool) {

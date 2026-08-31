@@ -37,6 +37,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - com.googleusercontent.apps.41146548867-btsmojjnpkc7nbmup1sdp4rnr8f1ula1
+          - CFBundleURLName: io.paktly.invitation
+            CFBundleURLSchemes:
+              - paktly
         UIRequiresFullScreen: false
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait

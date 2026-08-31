@@ -15,7 +15,14 @@ struct PaktlyApp: App {
                 .environmentObject(model)
                 .tint(PaktlyColor.forest)
                 .onOpenURL { url in
-                    _ = GIDSignIn.sharedInstance.handle(url)
+                    if !GIDSignIn.sharedInstance.handle(url) {
+                        model.handleIncomingURL(url)
+                    }
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL {
+                        model.handleIncomingURL(url)
+                    }
                 }
         }
     }

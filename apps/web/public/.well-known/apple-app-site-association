@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["GC29BX444D.io.paktly.app"],
+        "components": [
+          {
+            "/": "/invite",
+            "?": { "token": "*" },
+            "comment": "Paktly plan invitations"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["GC29BX444D.io.paktly.app"]
+  }
+}

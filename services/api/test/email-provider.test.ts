@@ -66,4 +66,29 @@ describe("SmtpEmailProvider", () => {
       requireTLS: true
     }));
   });
+
+  it("sends a secure plan invitation with the account creation link", async () => {
+    const provider = new SmtpEmailProvider({
+      host: "smtppro.zoho.com",
+      port: 465,
+      secure: true,
+      username: "hello@paktly.io",
+      password: "app-password",
+      from: "Paktly <hello@paktly.io>"
+    });
+
+    await provider.sendPlanInvitation({
+      recipient: "new-member@example.com",
+      inviterName: "Alex",
+      planName: "Lisbon summer",
+      invitationUrl: "https://paktly.io/invite?token=secure-token",
+      expiresInDays: 7
+    });
+
+    expect(smtp.sendMail).toHaveBeenCalledWith(expect.objectContaining({
+      to: "new-member@example.com",
+      subject: "Alex invited you to Lisbon summer on Paktly",
+      text: expect.stringContaining("https://paktly.io/invite?token=secure-token")
+    }));
+  });
 });

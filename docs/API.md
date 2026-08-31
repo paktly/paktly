@@ -40,3 +40,16 @@ Core routes:
 Expense mutations accept UUID `clientOperationId` values. Retrying a create with the same ID returns the original expense. Updates require `expectedVersion` and fail with `409` after a concurrent edit. Amounts are integer minor units. Percentage weights are integer basis points totaling `10000`.
 
 For a currency different from the plan currency, the request must include `exchangeRate` with positive integer `numerator` and `denominator`, provider, and timestamp. That snapshot is never recomputed.
+
+## Plan invitations
+
+`POST /groups/:groupId/invitations` accepts `{ "identifier": "@username" }` or
+`{ "identifier": "friend@example.com" }`. Usernames are resolved to the active
+Paktly account's verified email. Email addresses do not need to belong to an
+existing account: the recipient receives a seven-day, single-use link at
+`PUBLIC_APP_URL/invite?token=...` and can create a Paktly account before accepting.
+
+Invitation acceptance is deliberately email-bound. The account accepting the
+token must be signed in with the same normalized email address that received the
+invitation. Acceptance is transactional and creates membership, the member's
+ledger account, activity history, and member notifications exactly once.

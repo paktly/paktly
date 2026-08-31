@@ -51,6 +51,14 @@ h1 em { color: var(--mint-deep); font-weight: 500; }
 .button.primary { color: white; background: var(--forest); }
 .button.light { color: var(--forest); background: white; }
 .text-link { font-weight: 750; }
+.invitation-page { min-height: calc(100vh - 88px); display: grid; place-items: center; padding-block: 72px; }
+.invitation-card { width: min(620px, 100%); padding: clamp(30px, 7vw, 58px); border: 1px solid var(--line); border-radius: 36px; background: var(--paper); box-shadow: var(--shadow); text-align: center; }
+.invitation-mark { width: 78px; height: 78px; margin: 0 auto 24px; }
+.invitation-mark svg { width: 100%; height: 100%; }
+.invitation-card h1 { margin: 18px 0; font-size: clamp(38px, 7vw, 58px); }
+.invitation-card > p { margin: 0 auto; max-width: 480px; color: var(--muted); font-size: 17px; line-height: 1.65; }
+.invitation-actions { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 30px; }
+.invitation-card small { display: block; margin-top: 34px; color: var(--muted); line-height: 1.5; }
 .social-proof { display: flex; align-items: center; gap: 14px; margin-top: 46px; }
 .mini-avatars { display: flex; }
 .mini-avatars span { display: grid; place-items: center; width: 32px; height: 32px; margin-left: -7px; border: 2px solid var(--cream); border-radius: 50%; background: var(--lavender); font-size: 11px; font-weight: 800; }

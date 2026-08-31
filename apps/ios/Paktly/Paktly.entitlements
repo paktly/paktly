@@ -8,6 +8,7 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
     <array>
+        <string>applinks:paktly.io</string>
         <string>webcredentials:paktly.io</string>
         <string>webcredentials:socket.fi</string>
     </array>

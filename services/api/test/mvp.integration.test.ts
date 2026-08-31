@@ -33,11 +33,15 @@ suite("expense-sharing MVP end to end", () => {
     expect(profile.json().profile.username).toBe("alice_on_tour");
     const taken = await app.inject({ method: "POST", url: "/api/v1/me/username-availability", headers: auth("bob"), payload: { username: "alice on tour" } });
     expect(taken.json()).toEqual({ username: "alice_on_tour", available: false, reason: "TAKEN" });
+    const bobProfile = await app.inject({ method: "PATCH", url: "/api/v1/me", headers: auth("bob"), payload: { username: "bob_builder" } });
+    expect(bobProfile.statusCode).toBe(200);
     const created = await app.inject({ method: "POST", url: "/api/v1/groups", headers: auth("alice"), payload: { name: "Shared summer", description: "Not only a trip", defaultCurrency: "USD" } });
     expect(created.statusCode).toBe(201); groupId = created.json().group.id;
     for (const name of ["bob", "charlie"]) {
-      const invited = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { email: `${name}@example.com` } });
+      const identifier = name === "bob" ? "@bob_builder" : `${name}@example.com`;
+      const invited = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { identifier } });
       expect(invited.statusCode).toBe(201);
+      expect(invited.json().invitation.email).toBe(`${name}@example.com`);
       const accepted = await app.inject({ method: "POST", url: "/api/v1/invitations/accept", headers: auth(name), payload: { token: invited.json().invitation.token } });
       expect(accepted.statusCode).toBe(200);
     }

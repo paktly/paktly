@@ -173,9 +173,7 @@ private struct NotificationResponse: Decodable {
 
 private struct EmptyRequest: Encodable {}
 
-private struct InvitationRequest: Encodable {
-    let email: String
-}
+private struct InvitationRequest: Encodable { let identifier: String }
 
 private struct InvitationPayload: Decodable {
     let id: String
@@ -452,12 +450,12 @@ actor APIClient {
         )
     }
 
-    func invite(groupID: String, email: String) async throws -> String? {
+    func invite(groupID: String, identifier: String) async throws -> String? {
         let response = try await send(
             InvitationResponse.self,
             path: "groups/\(groupID)/invitations",
             method: "POST",
-            body: InvitationRequest(email: email)
+            body: InvitationRequest(identifier: identifier)
         )
         return response.invitation.token
     }

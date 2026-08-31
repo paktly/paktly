@@ -10,7 +10,8 @@ describe("loadEnvironment", () => {
       databaseUrl: "postgres://pakt:pakt_local_only@localhost:56432/pakt",
       emailAuth: {
         enabled: false,
-        from: "Paktly <hello@paktly.io>"
+        from: "Paktly <hello@paktly.io>",
+        publicAppUrl: "https://paktly.io"
       },
       appleAuth: {
         enabled: false,
@@ -93,6 +94,7 @@ describe("loadEnvironment", () => {
       enabled: true,
       otpSecret: "a".repeat(32),
       from: "Paktly <hello@paktly.io>",
+      publicAppUrl: "https://paktly.io",
       smtp: {
         host: "smtppro.zoho.com",
         port: 465,

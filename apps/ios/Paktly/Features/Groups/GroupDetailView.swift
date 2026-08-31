@@ -491,42 +491,113 @@ private struct InviteView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let groupID: String
-    @State private var email = ""
+    @State private var identifier = ""
     @State private var developmentToken: String?
+    @State private var sending = false
+    @State private var errorMessage: String?
+    @State private var sentIdentifier: String?
+
+    private var normalizedIdentifier: String {
+        identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("friend@example.com", text: $email)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Bring someone in")
+                            .font(.system(.title2, design: .rounded, weight: .bold))
+                            .foregroundStyle(PaktlyColor.ink)
+                        Text("Invite an existing Paktly member by username, or use any email address. New members will receive a secure account-creation link.")
+                            .font(.subheadline)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                            .lineSpacing(2)
+                    }
 
-                if let developmentToken {
-                    Section("Local testing code") {
-                        Text(developmentToken)
-                            .textSelection(.enabled)
-                        ShareLink(item: developmentToken)
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text("USERNAME OR EMAIL")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.9)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.badge.plus")
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            TextField("@username or friend@example.com", text: $identifier)
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.emailAddress)
+                                .autocorrectionDisabled()
+                                .textContentType(.username)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 56)
+                        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
+                        }
+                    }
+
+                    if let sentIdentifier {
+                        Label("Invitation sent to \(sentIdentifier)", systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PaktlyColor.forest)
+                            .padding(15)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(PaktlyColor.mint.opacity(0.25), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                    }
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(PaktlyColor.coral)
+                    }
+
+                    Button { Task { await sendInvitation() } } label: {
+                        HStack(spacing: 8) {
+                            if sending { ProgressView().tint(PaktlyColor.background) }
+                            Text(sending ? "Sending…" : "Send invitation")
+                        }
+                    }
+                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                    .disabled(normalizedIdentifier.count < 3 || sending)
+
+                    if let developmentToken {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("LOCAL TESTING TOKEN").font(.caption2.weight(.bold)).tracking(0.8)
+                            Text(developmentToken).font(.caption.monospaced()).textSelection(.enabled)
+                            ShareLink(item: developmentToken) { Label("Share token", systemImage: "square.and.arrow.up") }
+                        }
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                        .padding(15)
+                        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
                     }
                 }
+                .padding(20)
             }
-            .navigationTitle("Invite member")
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .navigationTitle("Invite people")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Send") {
-                        Task {
-                            do {
-                                developmentToken = try await model.client.invite(groupID: groupID, email: email)
-                            } catch {
-                                developmentToken = nil
-                            }
-                        }
-                    }
-                    .disabled(!email.contains("@"))
-                }
             }
         }
+    }
+
+    private func sendInvitation() async {
+        guard normalizedIdentifier.count >= 3, !sending else { return }
+        sending = true
+        errorMessage = nil
+        sentIdentifier = nil
+        do {
+            developmentToken = try await model.client.invite(groupID: groupID, identifier: normalizedIdentifier)
+            sentIdentifier = normalizedIdentifier
+            identifier = ""
+        } catch {
+            developmentToken = nil
+            errorMessage = "We couldn’t send this invitation. Check the username or email and try again."
+        }
+        sending = false
     }
 }

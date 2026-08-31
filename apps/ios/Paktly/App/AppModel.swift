@@ -1,6 +1,10 @@
 import Foundation
 import Combine
 
+struct PlanInvitationFailure: Error {
+    let failedIdentifiers: [String]
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     enum LoadState: Equatable { case idle, loading, loaded, failed(String) }
@@ -23,6 +27,17 @@ final class AppModel: ObservableObject {
         do {
             async let groups = client.groups(); async let notifications = client.notifications(); async let user = client.me()
             self.groups = try await groups; self.notifications = try await notifications; currentUser = try await user
+            if let invitationToken = PendingInvitationStore.load() {
+                do {
+                    try await client.acceptInvitation(token: invitationToken)
+                    PendingInvitationStore.clear()
+                    self.groups = try await client.groups()
+                    self.notifications = try await client.notifications()
+                } catch {
+                    state = .failed("Sign in with the email address that received the invitation, or request a new link.")
+                    return
+                }
+            }
             if let first = self.groups.first, let balanceData = try? await client.balances(groupID: first.id) {
                 dashboardCurrency = first.defaultCurrency
                 let own = balanceData.0.first { $0.userId == currentUser?.id }?.netMinor ?? 0
@@ -32,22 +47,43 @@ final class AppModel: ObservableObject {
         } catch { state = .failed("We couldn’t refresh your shared plans.") }
     }
 
-    func createPlan(name: String, description: String?, currency: String, memberEmails: [String] = []) async throws -> APIGroup {
+    func handleIncomingURL(_ url: URL) {
+        let isWebInvitation = ["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host == "paktly.io" && url.path == "/invite"
+        let isAppInvitation = url.scheme?.lowercased() == "paktly" && url.host == "invite"
+        guard isWebInvitation || isAppInvitation,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
+              token.count >= 20 else { return }
+        PendingInvitationStore.save(token)
+        if KeychainTokenStore.load() != nil {
+            Task { await refresh() }
+        }
+    }
+
+    func createPlan(name: String, description: String?, currency: String, memberIdentifiers: [String] = []) async throws -> APIGroup {
         let group = try await client.createGroup(
             name: name,
             description: description,
             currency: currency
         )
 
-        let normalizedEmails = memberEmails
+        let normalizedIdentifiers = memberIdentifiers
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
 
-        for email in normalizedEmails {
-            try? await client.invite(groupID: group.id, email: email)
+        var failedIdentifiers: [String] = []
+        for identifier in normalizedIdentifiers {
+            do {
+                try await client.invite(groupID: group.id, identifier: identifier)
+            } catch {
+                failedIdentifiers.append(identifier)
+            }
         }
 
         await refresh()
+        if !failedIdentifiers.isEmpty {
+            throw PlanInvitationFailure(failedIdentifiers: failedIdentifiers)
+        }
         return group
     }
 
@@ -67,5 +103,21 @@ final class AppModel: ObservableObject {
         catch { state = .failed("The expense could not be saved. Check the split and try again."); return false }
         pendingSyncCount = await offlineQueue.count()
         return true
+    }
+}
+
+private enum PendingInvitationStore {
+    private static let key = "io.paktly.pending-invitation"
+
+    static func save(_ token: String) {
+        UserDefaults.standard.set(token, forKey: key)
+    }
+
+    static func load() -> String? {
+        UserDefaults.standard.string(forKey: key)
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }

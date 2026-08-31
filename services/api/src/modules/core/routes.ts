@@ -259,17 +259,79 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
 
       authenticated.post("/groups/:groupId/invitations", async (request, reply) => {
         const { groupId } = parse(z.object({ groupId: uuid }), request.params, app.httpErrors.badRequest);
-        const body = parse(z.object({ email: z.string().email().transform((value) => value.toLowerCase()) }), request.body, app.httpErrors.badRequest);
+        const body = parse(
+          z.union([
+            z.object({ identifier: z.string().trim().min(3).max(254) }),
+            z.object({ email: z.string().trim().email() })
+          ]),
+          request.body,
+          app.httpErrors.badRequest
+        );
         const userId = request.authenticatedUser!.id;
         await requireMember(app, groupId, userId, true);
+        const rawIdentifier = ("identifier" in body ? body.identifier : body.email).trim().toLowerCase();
+        let invitationEmail: string;
+        let invitedUserId: string | undefined;
+        if (rawIdentifier.includes("@") && !rawIdentifier.startsWith("@")) {
+          const parsedEmail = z.string().email().safeParse(rawIdentifier);
+          if (!parsedEmail.success) throw app.httpErrors.badRequest("Enter a valid email address or Paktly username.");
+          invitationEmail = parsedEmail.data;
+          const [account] = await app.db`SELECT id FROM users WHERE email=${invitationEmail} AND status='ACTIVE'`;
+          invitedUserId = account ? String(account.id) : undefined;
+        } else {
+          const username = normalizeUsername(rawIdentifier.replace(/^@/, ""));
+          if (!isValidUsername(username)) throw app.httpErrors.badRequest("Enter a valid email address or Paktly username.");
+          const [account] = await app.db`
+            SELECT u.id,u.email FROM user_profiles p
+            JOIN users u ON u.id=p.user_id
+            WHERE p.username=${username} AND u.status='ACTIVE'
+          `;
+          if (!account) throw app.httpErrors.notFound("No Paktly member has that username.");
+          invitationEmail = String(account.email);
+          invitedUserId = String(account.id);
+        }
+        if (invitationEmail === request.authenticatedUser!.email) {
+          throw app.httpErrors.conflict("You are already a member of this plan.");
+        }
+        if (invitedUserId) {
+          const [membership] = await app.db`
+            SELECT 1 FROM group_members WHERE group_id=${groupId} AND user_id=${invitedUserId} AND status='ACTIVE'
+          `;
+          if (membership) throw app.httpErrors.conflict("That person is already a member of this plan.");
+        }
+        const [group] = await app.db`SELECT name FROM groups WHERE id=${groupId} AND status='ACTIVE'`;
+        if (!group) throw app.httpErrors.notFound("Plan not found.");
         const rawToken = randomBytes(24).toString("base64url");
         const invitationId = randomUUID();
         try {
-          await app.db`INSERT INTO invitations(id,group_id,email,invited_by,token_hash,expires_at) VALUES(${invitationId},${groupId},${body.email},${userId},${hashToken(rawToken)},now()+interval '7 days')`;
+          await app.db.begin(async (tx) => {
+            await tx`INSERT INTO invitations(id,group_id,email,invited_by,token_hash,expires_at) VALUES(${invitationId},${groupId},${invitationEmail},${userId},${hashToken(rawToken)},now()+interval '7 days')`;
+            await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary,metadata) VALUES(${randomUUID()},${groupId},${userId},'INVITATION_SENT','INVITATION',${invitationId},${`${request.authenticatedUser!.displayName} invited ${invitationEmail}`},${app.db.json({ email: invitationEmail })})`;
+            if (invitedUserId) {
+              await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) VALUES(${randomUUID()},${invitedUserId},${groupId},'INVITATION_RECEIVED','You were invited',${`${request.authenticatedUser!.displayName} invited you to ${String(group.name)}`},'INVITATION',${invitationId})`;
+            }
+          });
         } catch { throw app.httpErrors.conflict("A pending invitation already exists for this email."); }
-        await app.db`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary,metadata) VALUES(${randomUUID()},${groupId},${userId},'INVITATION_SENT','INVITATION',${invitationId},${`${request.authenticatedUser!.displayName} invited ${body.email}`},${app.db.json({ email: body.email })})`;
-        await app.db`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) SELECT ${randomUUID()},id,${groupId},'INVITATION_RECEIVED','You were invited',${`${request.authenticatedUser!.displayName} invited you to a shared plan`},'INVITATION',${invitationId} FROM users WHERE email=${body.email}`;
-        return reply.status(201).send({ invitation: { id: invitationId, email: body.email, status: "PENDING", ...(environment.nodeEnvironment !== "production" ? { token: rawToken } : {}) } });
+        const invitationUrl = `${environment.emailAuth?.publicAppUrl ?? "https://paktly.io"}/invite?token=${encodeURIComponent(rawToken)}`;
+        if (emailProvider) {
+          try {
+            await emailProvider.sendPlanInvitation({
+              recipient: invitationEmail,
+              inviterName: request.authenticatedUser!.displayName,
+              planName: String(group.name),
+              invitationUrl,
+              expiresInDays: 7
+            });
+          } catch (error) {
+            await app.db`UPDATE invitations SET status='REVOKED' WHERE id=${invitationId}`;
+            request.log.error({ err: error, invitationId }, "plan invitation delivery failed");
+            throw app.httpErrors.serviceUnavailable("We couldn’t send this invitation. Please try again.");
+          }
+        } else if (environment.nodeEnvironment === "production") {
+          await app.db`UPDATE invitations SET status='REVOKED' WHERE id=${invitationId}`;
+          throw app.httpErrors.serviceUnavailable("Invitation email delivery is not configured.");
+        }
+        return reply.status(201).send({ invitation: { id: invitationId, email: invitationEmail, status: "PENDING", ...(environment.nodeEnvironment !== "production" ? { token: rawToken } : {}) } });
       });
 
       authenticated.post("/invitations/accept", async (request) => {

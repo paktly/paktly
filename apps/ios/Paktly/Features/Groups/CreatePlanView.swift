@@ -9,39 +9,51 @@ enum PlanType: String, CaseIterable, Identifiable {
     case other = "Other"
 
     var id: String { rawValue }
+
     var subtitle: String {
         switch self {
-        case .trip:
-            return "Weekend escapes, vacations, and city trips."
-        case .home:
-            return "House shares, joint expenses, and recurring planning."
-        case .celebration:
-            return "Weddings, birthdays, and holidays."
-        case .event:
-            return "Conferences, meetings, and socials."
-        case .project:
-            return "Any collaborative purchase or initiative."
-        case .other:
-            return "Custom shared plan outside these categories."
+        case .trip: "Travel, weekends away, and group holidays"
+        case .home: "Household costs and recurring shared expenses"
+        case .celebration: "Weddings, birthdays, and special occasions"
+        case .event: "Conferences, meetups, and social events"
+        case .project: "Group purchases and collaborative projects"
+        case .other: "Anything else you are organizing together"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .trip: "airplane"
+        case .home: "house.fill"
+        case .celebration: "sparkles"
+        case .event: "calendar"
+        case .project: "hammer.fill"
+        case .other: "circle.grid.2x2.fill"
         }
     }
 }
 
 struct CreatePlanView: View {
     enum Step: Int, CaseIterable {
-        case details = 0
+        case details
         case money
         case members
         case review
 
         var title: String {
             switch self {
-            case .details: return "Plan details"
-            case .money: return "Money setup"
-            case .members: return "Members"
-            case .review: return "Review"
+            case .details: "Details"
+            case .money: "Money"
+            case .members: "People"
+            case .review: "Review"
             }
         }
+    }
+
+    private enum FocusField: Hashable {
+        case name
+        case notes
+        case email
     }
 
     struct PlanDraft {
@@ -49,7 +61,7 @@ struct CreatePlanView: View {
         var type: PlanType = .trip
         var details = ""
         var currency = "USD"
-        var memberEmails: [String] = []
+        var memberIdentifiers: [String] = []
     }
 
     @EnvironmentObject private var model: AppModel
@@ -58,398 +70,484 @@ struct CreatePlanView: View {
     @State private var currentStep: Step = .details
     @State private var memberEmailInput = ""
     @State private var creating = false
+    @State private var planCreated = false
     @State private var createError: String?
     @State private var stepError: String?
-    @State private var currencyText = "USD"
-    @FocusState private var isEmailFocused: Bool
+    @State private var showingPlanTypes = false
+    @State private var showingCurrencies = false
+    @FocusState private var focusedField: FocusField?
 
     private let supportedCurrencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "SGD", "CHF", "NOK"]
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                progressHeader
-
-                ScrollView {
-                    VStack(spacing: 22) {
-                        section
-                    }
-                    .padding(20)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    progressHeader
+                    currentSection
                 }
-
-                HStack(spacing: 14) {
-                    if currentStep != .details {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                stepBack()
-                            }
-                        } label: {
-                            Text("Back")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.roundedRectangle(radius: 14))
-                    }
-
-                    Button {
-                        Task {
-                            await nextOrCreate()
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if creating {
-                                ProgressView().tint(PaktlyColor.background)
-                            }
-                            Text(primaryButtonTitle)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .padding(.vertical, 12)
-                    }
-                    .buttonStyle(PaktlyPrimaryButtonStyle())
-                    .disabled(!canContinue || creating)
-                }
-                .padding(16)
-                .background(PaktlyColor.surface)
+                .frame(maxWidth: 560, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 30)
+                .frame(maxWidth: .infinity)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Create plan")
+            .navigationTitle("New plan")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(PaktlyColor.forest)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
                 }
             }
+            .safeAreaInset(edge: .bottom) { bottomBar }
+            .sheet(isPresented: $showingPlanTypes) {
+                PlanTypePicker(selection: $draft.type)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingCurrencies) {
+                CurrencyPicker(currencies: supportedCurrencies, selection: $draft.currency)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
+        .interactiveDismissDisabled(creating)
     }
 
     private var progressHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Set it up in a few steps")
-                    .font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(currentStep.title)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PaktlyColor.ink)
                 Spacer()
-                Text("Step \(currentStep.rawValue + 1) of \(Step.allCases.count)")
-                    .font(.subheadline.weight(.semibold))
+                Text("\(currentStep.rawValue + 1) of \(Step.allCases.count)")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(PaktlyColor.secondaryInk)
+                    .monospacedDigit()
             }
-            progressIndicator
-        }
-        .padding(20)
-        .background(PaktlyColor.surface)
-    }
-
-    private var progressIndicator: some View {
-        HStack(spacing: 10) {
-            ForEach(Step.allCases, id: \.self) { step in
-                HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                ForEach(Step.allCases, id: \.self) { step in
                     Capsule()
-                        .fill(step.rawValue <= currentStep.rawValue ? PaktlyColor.forest : PaktlyColor.surface)
-                        .frame(height: 6)
-                        .frame(maxWidth: .infinity)
-                    Text(step.rawValue == currentStep.rawValue ? "●" : "○")
-                        .font(.caption2)
-                        .foregroundStyle(step.rawValue <= currentStep.rawValue ? PaktlyColor.forest : PaktlyColor.secondaryInk)
+                        .fill(step.rawValue <= currentStep.rawValue
+                            ? PaktlyColor.forest
+                            : PaktlyColor.secondaryInk.opacity(0.16))
+                        .frame(height: 4)
                 }
             }
         }
-        .foregroundStyle(PaktlyColor.secondaryInk)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Step \(currentStep.rawValue + 1) of \(Step.allCases.count), \(currentStep.title)")
     }
 
     @ViewBuilder
-    private var section: some View {
+    private var currentSection: some View {
         switch currentStep {
-        case .details:
-            detailsSection
-        case .money:
-            moneySection
-        case .members:
-            membersSection
-        case .review:
-            reviewSection
+        case .details: detailsSection
+        case .money: moneySection
+        case .members: membersSection
+        case .review: reviewSection
         }
     }
 
     private var detailsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("What are you planning together?")
-
-            card {
-                VStack(spacing: 14) {
-                    LabeledContent("Plan name") {
-                        TextField("Weekend in Lisbon", text: $draft.name)
-                            .textInputAutocapitalization(.words)
-                            .submitLabel(.next)
+        VStack(alignment: .leading, spacing: 24) {
+            pageHeading(
+                "What are you planning?",
+                subtitle: "Give everyone a clear place to coordinate, track costs, and settle up."
+            )
+            VStack(alignment: .leading, spacing: 20) {
+                formField("Plan name", hint: "Choose a name everyone will recognize") {
+                    TextField("e.g. Summer in Lisbon", text: $draft.name)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .name)
+                        .onSubmit { focusedField = .notes }
+                        .onChange(of: draft.name) { _, _ in stepError = nil }
+                }
+                formField("Plan type", hint: "This helps Paktly tailor the plan") {
+                    Button {
+                        focusedField = nil
+                        showingPlanTypes = true
+                    } label: {
+                        selectorRow(icon: draft.type.icon, title: draft.type.rawValue, subtitle: draft.type.subtitle)
                     }
-
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Plan type")
-                            .font(.subheadline)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                        Picker("Plan type", selection: $draft.type) {
-                            ForEach(PlanType.allCases) { option in
-                                Text(option.rawValue).tag(option)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        Text(draft.type.subtitle)
-                            .font(.footnote)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                    }
-
-                    Divider()
-
-                    LabeledContent("Description") {
-                        TextField("Optional notes for your plan", text: $draft.details, axis: .vertical)
-                            .lineLimit(3...4)
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Plan type, \(draft.type.rawValue)")
+                    .accessibilityHint("Opens the plan type selector")
+                }
+                formField("Notes", hint: "Optional") {
+                    TextField("Add a short description or shared goal", text: $draft.details, axis: .vertical)
+                        .lineLimit(3...5)
+                        .focused($focusedField, equals: .notes)
                 }
             }
-
-            if let stepError {
-                formError
-            }
+            validationMessage
         }
     }
 
     private var moneySection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("How will money move?")
-
-            card {
-                VStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Default currency")
-                            .font(.subheadline)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                        TextField("USD", text: $currencyText)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .onChange(of: currencyText) { newValue in
-                                let normalized = newValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-                                currencyText = normalized
-                                draft.currency = normalized
-                            }
-                        Text("Currency can be changed later in plan preferences.")
-                            .font(.footnote)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Popular currencies")
-                            .font(.subheadline)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-
-                    FlowLayout(spacing: 8) {
-                            ForEach(supportedCurrencies, id: \.self) { currency in
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.12)) {
-                                        draft.currency = currency
-                                        currencyText = currency
-                                    }
-                                } label: {
-                                    Text(currency)
-                                        .font(.subheadline.weight(.semibold))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(draft.currency == currency ? PaktlyColor.forest.opacity(0.16) : PaktlyColor.surface)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .stroke(draft.currency == currency ? PaktlyColor.forest : PaktlyColor.secondaryInk.opacity(0.3), lineWidth: 1)
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 24) {
+            pageHeading(
+                "Choose the plan currency",
+                subtitle: "Balances and summaries will use this currency. Individual expenses can still be recorded in others."
+            )
+            formField("Default currency", hint: "Change this before expenses are added") {
+                Button {
+                    focusedField = nil
+                    showingCurrencies = true
+                } label: {
+                    selectorRow(
+                        icon: "banknote.fill",
+                        title: currencyDisplayName(draft.currency),
+                        subtitle: draft.currency
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Default currency, \(draft.currency)")
+                .accessibilityHint("Opens the currency selector")
             }
-
-            if let stepError {
-                formError
-            }
+            infoPanel(
+                icon: "globe.americas.fill",
+                title: "Built for more than one currency",
+                message: "Paktly preserves an expense’s original currency and its recorded conversion rate."
+            )
+            validationMessage
         }
     }
 
     private var membersSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("Invite the people who join")
-
-            card {
-                VStack(spacing: 12) {
-                    HStack(alignment: .top, spacing: 8) {
-                        TextField("friend@example.com", text: $memberEmailInput)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .autocorrectionDisabled()
-                            .focused($isEmailFocused)
-                            .onSubmit { addMemberEmail() }
-
-                        Button {
-                            addMemberEmail()
-                        } label: {
-                            Image(systemName: "plus")
-                                .frame(width: 40, height: 40)
-                                .background(PaktlyColor.mint)
-                                .clipShape(Circle())
-                                .foregroundStyle(PaktlyColor.ink)
-                        }
-                        .disabled(!isValidEmail(memberEmailInput))
+        VStack(alignment: .leading, spacing: 24) {
+            pageHeading(
+                "Who’s part of the plan?",
+                subtitle: "Invite people now, or keep going and add them from the plan later."
+            )
+            formField("Username or email", hint: "Sent after the plan is created") {
+                HStack(spacing: 10) {
+                    TextField("@username or friend@example.com", text: $memberEmailInput)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .textContentType(.emailAddress)
+                        .submitLabel(.done)
+                        .focused($focusedField, equals: .email)
+                        .onSubmit { addMemberEmail() }
+                    Button { addMemberEmail() } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(PaktlyColor.background)
+                            .frame(width: 44, height: 44)
+                            .background(PaktlyColor.forest, in: Circle())
                     }
-
-                    if draft.memberEmails.isEmpty {
-                        Text("You can add members later from the plan detail screen.")
-                            .font(.footnote)
-                            .foregroundStyle(PaktlyColor.secondaryInk)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
-                            ForEach(draft.memberEmails, id: \.self) { email in
-                                HStack(spacing: 8) {
-                                    Text(email)
-                                        .lineLimit(1)
-                                        .font(.footnote)
-                                    Button {
-                                        draft.memberEmails.removeAll { $0 == email }
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(PaktlyColor.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(PaktlyColor.secondaryInk.opacity(0.18), lineWidth: 1)
-                                )
+                    .buttonStyle(.plain)
+                    .disabled(!isValidInviteIdentifier(memberEmailInput))
+                    .accessibilityLabel("Add invitation")
+                }
+            }
+            if draft.memberIdentifiers.isEmpty {
+                infoPanel(
+                    icon: "person.2.fill",
+                    title: "Start solo if you want",
+                    message: "A plan does not need invitations yet. You will be its first admin."
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("PEOPLE TO INVITE")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.9)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                    VStack(spacing: 0) {
+                        ForEach(Array(draft.memberIdentifiers.enumerated()), id: \.element) { index, email in
+                            inviteRow(email)
+                            if index < draft.memberIdentifiers.count - 1 {
+                                Divider().padding(.leading, 52)
                             }
                         }
                     }
-
-                    Text("Invites are sent after the plan is created.")
-                        .font(.footnote)
-                        .foregroundStyle(PaktlyColor.secondaryInk)
+                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(PaktlyColor.secondaryInk.opacity(0.13), lineWidth: 1)
+                    }
                 }
             }
-
-            if let stepError {
-                formError
-            }
+            validationMessage
         }
     }
 
     private var reviewSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("Review before create")
-
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label {
-                        Text("Plan name")
-                    } icon: {
-                        Image(systemName: "text.badge.star")
-                    }
-
-                    Text(draft.name.isEmpty ? "Unnamed plan" : draft.name)
-                        .font(.title3.bold())
-
-                    LabeledContent("Type") {
+        VStack(alignment: .leading, spacing: 24) {
+            pageHeading(
+                "Everything look right?",
+                subtitle: "You can edit these details later from plan settings."
+            )
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 14) {
+                    Image(systemName: draft.type.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(PaktlyColor.forest)
+                        .frame(width: 48, height: 48)
+                        .background(PaktlyColor.mint.opacity(0.55), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(draft.name.trimmingCharacters(in: .whitespacesAndNewlines))
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(PaktlyColor.ink)
                         Text(draft.type.rawValue)
+                            .font(.subheadline)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
                     }
-                    Divider()
-                    LabeledContent("Currency") { Text(draft.currency.isEmpty ? "USD" : draft.currency) }
-                    Divider()
-                    LabeledContent("Members to invite") {
-                        Text(draft.memberEmails.isEmpty ? "None now" : "\(draft.memberEmails.count) email(s)")
+                    Spacer()
+                }
+                .padding(18)
+                Divider()
+                reviewRow("Currency", value: draft.currency)
+                Divider().padding(.leading, 18)
+                reviewRow("Invitations", value: draft.memberIdentifiers.isEmpty ? "None yet" : "\(draft.memberIdentifiers.count)")
+                if !draft.details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Divider().padding(.leading, 18)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("NOTES")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.8)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                        Text(draft.details)
+                            .font(.subheadline)
+                            .foregroundStyle(PaktlyColor.ink)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    if !draft.details.isEmpty {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Notes")
-                                .font(.caption)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
-                            Text(draft.details)
-                                .font(.subheadline)
-                                .foregroundStyle(PaktlyColor.ink)
-                        }
-                    }
+                    .padding(18)
                 }
             }
-
+            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(PaktlyColor.secondaryInk.opacity(0.13), lineWidth: 1)
+            }
             if let createError {
-                Text(createError)
+                Label(createError, systemImage: "exclamationmark.circle.fill")
                     .font(.footnote)
                     .foregroundStyle(PaktlyColor.coral)
-                    .padding(.horizontal, 2)
             }
         }
     }
 
-    private var formError: some View {
-        Text(stepError ?? "")
-            .font(.footnote)
-            .foregroundStyle(PaktlyColor.coral)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            if currentStep != .details {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { stepBack() }
+                } label: {
+                    Text("Back")
+                        .font(.headline)
+                        .foregroundStyle(PaktlyColor.ink)
+                        .frame(width: 96, height: 52)
+                        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(PaktlyColor.secondaryInk.opacity(0.18), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(creating)
+            }
+            Button { Task { await nextOrCreate() } } label: {
+                HStack(spacing: 8) {
+                    if creating { ProgressView().tint(PaktlyColor.background) }
+                    Text(primaryButtonTitle)
+                }
+            }
+            .buttonStyle(PaktlyPrimaryButtonStyle())
+            .disabled(!canContinue || creating)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) { Divider().opacity(0.5) }
+    }
+
+    private func pageHeading(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(PaktlyColor.ink)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(PaktlyColor.secondaryInk)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func formField<Content: View>(
+        _ label: String,
+        hint: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(PaktlyColor.ink)
+                if let hint {
+                    Text(hint)
+                        .font(.caption)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                }
+            }
+            content()
+                .padding(.horizontal, 16)
+                .frame(minHeight: 56)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
+                }
+        }
+    }
+
+    private func selectorRow(icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(PaktlyColor.forest)
+                .frame(width: 36, height: 36)
+                .background(PaktlyColor.mint.opacity(0.5), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(PaktlyColor.ink)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 10)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(PaktlyColor.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func infoPanel(icon: String, title: String, message: String) -> some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(PaktlyColor.forest)
+                .frame(width: 36, height: 36)
+                .background(PaktlyColor.mint.opacity(0.42), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+                Text(message).font(.caption).foregroundStyle(PaktlyColor.secondaryInk).lineSpacing(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(15)
+        .background(PaktlyColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func inviteRow(_ email: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "envelope.fill")
+                .font(.caption)
+                .foregroundStyle(PaktlyColor.forest)
+                .frame(width: 36, height: 36)
+                .background(PaktlyColor.mint.opacity(0.45), in: Circle())
+            Text(email)
+                .font(.subheadline)
+                .foregroundStyle(PaktlyColor.ink)
+                .lineLimit(1)
+            Spacer()
+            Button {
+                draft.memberIdentifiers.removeAll { $0 == email }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(email)")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func reviewRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label).font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+            Spacer()
+            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+        }
+        .padding(18)
+    }
+
+    @ViewBuilder
+    private var validationMessage: some View {
+        if let stepError {
+            Label(stepError, systemImage: "exclamationmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(PaktlyColor.coral)
+        }
     }
 
     private var primaryButtonTitle: String {
-        switch currentStep {
-        case .review:
-            return creating ? "Creating…" : "Create plan"
-        default:
-            return "Continue"
-        }
+        if planCreated { return "Done" }
+        return currentStep == .review ? (creating ? "Creating…" : "Create plan") : "Continue"
     }
 
     private var canContinue: Bool {
-        guard stepError == nil else { return false }
         switch currentStep {
-        case .details:
-            return !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .money:
-            return isValidCurrency(draft.currency)
-        case .members:
-            return true
-        case .review:
-            return !creating
+        case .details: !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .money: isValidCurrency(draft.currency)
+        case .members: true
+        case .review: !creating
         }
     }
 
     private func nextOrCreate() async {
-        guard stepError == nil else { return }
-
+        if planCreated {
+            dismiss()
+            return
+        }
         guard validateCurrentStep() else { return }
-
         if currentStep == .review {
             creating = true
+            focusedField = nil
             createError = nil
-            let normalizedCurrency = draft.currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             let normalizedDescription = [draft.type.rawValue, draft.details]
                 .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 .joined(separator: " · ")
-
             do {
                 _ = try await model.createPlan(
                     name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
                     description: normalizedDescription.isEmpty ? nil : normalizedDescription,
-                    currency: normalizedCurrency,
-                    memberEmails: draft.memberEmails
+                    currency: draft.currency,
+                    memberIdentifiers: draft.memberIdentifiers
                 )
                 dismiss()
-            } catch {
-                createError = "Could not create the plan. Please try again."
+            } catch let failure as PlanInvitationFailure {
+                let recipients = failure.failedIdentifiers.joined(separator: ", ")
+                createError = "Your plan was created, but we couldn’t invite: \(recipients). Open Members to try again."
+                planCreated = true
                 creating = false
-                isEmailFocused = false
+            } catch {
+                createError = "We couldn’t create this plan. Your details are still here—please try again."
+                creating = false
             }
             return
         }
-
+        focusedField = nil
+        stepError = nil
         withAnimation(.easeInOut(duration: 0.2)) {
             guard let next = Step(rawValue: currentStep.rawValue + 1) else { return }
             currentStep = next
@@ -458,126 +556,158 @@ struct CreatePlanView: View {
 
     private func stepBack() {
         guard let previous = Step(rawValue: currentStep.rawValue - 1) else { return }
+        focusedField = nil
         stepError = nil
+        createError = nil
         currentStep = previous
     }
 
     private func validateCurrentStep() -> Bool {
         switch currentStep {
-        case .details:
-            if draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stepError = "Enter a plan name to continue."
-                return false
-            } else {
-                stepError = nil
-                return true
-            }
-        case .money:
-            if !isValidCurrency(draft.currency) {
-                stepError = "Use a valid 3-letter currency code."
-                return false
-            } else {
-                stepError = nil
-                return true
-            }
-        case .members, .review:
+        case .details where draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+            stepError = "Enter a plan name to continue."
+            focusedField = .name
+            return false
+        case .money where !isValidCurrency(draft.currency):
+            stepError = "Choose a supported currency to continue."
+            return false
+        default:
             stepError = nil
             return true
         }
     }
 
     private func isValidCurrency(_ value: String) -> Bool {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard trimmed.count == 3 else { return false }
-        return trimmed.allSatisfy { $0.isLetter }
+        supportedCurrencies.contains(value)
     }
 
-    private func isValidEmail(_ value: String) -> Bool {
+    private func isValidInviteIdentifier(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.contains("@") && trimmed.contains(".") && trimmed.count > 4
+        if trimmed.contains("@") && !trimmed.hasPrefix("@") {
+            return trimmed.contains(".") && trimmed.count > 4
+        }
+        let username = trimmed.lowercased().replacingOccurrences(of: " ", with: "_").trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        return username.count >= 3 && username.count <= 30 && username.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
     }
 
     private func addMemberEmail() {
         let normalized = memberEmailInput.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard isValidEmail(normalized), !draft.memberEmails.contains(normalized) else { return }
-        draft.memberEmails.append(normalized)
+        guard isValidInviteIdentifier(normalized) else { return }
+        let identifier = normalized.hasPrefix("@")
+            ? String(normalized.dropFirst()).replacingOccurrences(of: " ", with: "_")
+            : normalized
+        guard !draft.memberIdentifiers.contains(identifier) else { return }
+        draft.memberIdentifiers.append(identifier)
         memberEmailInput = ""
-        isEmailFocused = false
+        focusedField = .email
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(PaktlyColor.ink)
-    }
-
-    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content()
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(PaktlyColor.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
-            )
+    private func currencyDisplayName(_ code: String) -> String {
+        Locale.current.localizedString(forCurrencyCode: code) ?? code
     }
 }
 
-private struct FlowLayout: Layout {
-    var spacing: CGFloat
+private struct PlanTypePicker: View {
+    @Binding var selection: PlanType
+    @Environment(\.dismiss) private var dismiss
 
-    init(spacing: CGFloat) { self.spacing = spacing }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? 0
-        var rows = [[CGRect]]()
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var currentRowHeight: CGFloat = 0
-        var currentRow = [CGRect]()
-
-        for index in 0..<subviews.count {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth, !currentRow.isEmpty {
-                rows.append(currentRow)
-                currentY += currentRowHeight + spacing
-                currentX = 0
-                currentRowHeight = 0
-                currentRow = []
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(PlanType.allCases) { type in
+                        Button {
+                            selection = type
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: type.icon)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(PaktlyColor.forest)
+                                    .frame(width: 42, height: 42)
+                                    .background(PaktlyColor.mint.opacity(0.48), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(type.rawValue)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(PaktlyColor.ink)
+                                    Text(type.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(PaktlyColor.secondaryInk)
+                                        .lineLimit(2)
+                                }
+                                Spacer(minLength: 8)
+                                if selection == type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(PaktlyColor.forest)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(selection == type ? PaktlyColor.forest.opacity(0.55) : PaktlyColor.secondaryInk.opacity(0.12), lineWidth: 1)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(20)
             }
-
-            currentRow.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-            currentX += size.width + spacing
-            currentRowHeight = max(currentRowHeight, size.height)
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .navigationTitle("Choose a plan type")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }.foregroundStyle(PaktlyColor.forest)
+                }
+            }
         }
-
-        if !currentRow.isEmpty {
-            rows.append(currentRow)
-        }
-
-        let maxRowHeight = rows.map { row in row.map { $0.height }.max() ?? 0 }.max() ?? 0
-        return CGSize(width: maxWidth, height: currentY + maxRowHeight)
     }
+}
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let maxWidth = bounds.width
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var currentRowHeight: CGFloat = 0
+private struct CurrencyPicker: View {
+    let currencies: [String]
+    @Binding var selection: String
+    @Environment(\.dismiss) private var dismiss
 
-        for index in 0..<subviews.count {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth, currentX > 0 {
-                currentY += currentRowHeight + spacing
-                currentX = 0
-                currentRowHeight = 0
+    var body: some View {
+        NavigationStack {
+            List(currencies, id: \.self) { code in
+                Button {
+                    selection = code
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(Locale.current.localizedString(forCurrencyCode: code) ?? code)
+                                .foregroundStyle(PaktlyColor.ink)
+                            Text(code)
+                                .font(.caption)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                        }
+                        Spacer()
+                        if selection == code {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(PaktlyColor.forest)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(PaktlyColor.surface)
             }
-
-            let origin = CGPoint(x: bounds.minX + currentX, y: bounds.minY + currentY)
-            subviews[index].place(at: origin, anchor: .topLeading, proposal: ProposedViewSize(width: size.width, height: size.height))
-            currentX += size.width + spacing
-            currentRowHeight = max(currentRowHeight, size.height)
+            .scrollContentBackground(.hidden)
+            .background(PaktlyColor.background)
+            .navigationTitle("Default currency")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }.foregroundStyle(PaktlyColor.forest)
+                }
+            }
         }
     }
 }

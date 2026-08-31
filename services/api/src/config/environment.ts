@@ -31,6 +31,7 @@ const environmentSchema = z.object({
   SMTP_USERNAME: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   EMAIL_FROM: z.string().default("Paktly <hello@paktly.io>"),
+  PUBLIC_APP_URL: z.string().url().default("https://paktly.io"),
   APPLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   APPLE_CLIENT_ID: z.string().min(3).optional(),
   GOOGLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
@@ -60,6 +61,7 @@ export type Environment = {
     enabled: boolean;
     otpSecret?: string;
     from: string;
+    publicAppUrl?: string;
     smtp?: {
       host: string;
       port: number;
@@ -167,6 +169,7 @@ export function loadEnvironment(
       enabled: parsed.data.EMAIL_AUTH_ENABLED,
       ...(parsed.data.EMAIL_OTP_SECRET ? { otpSecret: parsed.data.EMAIL_OTP_SECRET } : {}),
       from: parsed.data.EMAIL_FROM,
+      publicAppUrl: parsed.data.PUBLIC_APP_URL.replace(/\/$/, ""),
       ...(parsed.data.SMTP_HOST && parsed.data.SMTP_USERNAME && parsed.data.SMTP_PASSWORD
         ? {
             smtp: {

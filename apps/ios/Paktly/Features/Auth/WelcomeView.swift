@@ -26,24 +26,21 @@ struct WelcomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Spacer(minLength: 48)
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.3.fill")
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundStyle(PaktlyColor.forest)
-                            .frame(width: 42, height: 42)
-                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        Text("paktly")
-                            .font(.system(size: 25, weight: .bold, design: .rounded))
-                            .tracking(-0.5)
-                    }
+                    PaktlyWordmark(markSize: 44)
 
-                    Text("Plan together.\nSplit together.\nSave together.")
+                    Text("SHARED PLANS · SHARED GOALS · SHARED MONEY")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(PaktlyColor.forest)
+                        .padding(.top, 22)
+
+                    Text("Make the plan.\nMake it happen.\nTogether.")
                         .font(.system(size: 39, weight: .bold, design: .rounded))
                         .tracking(-1.1)
                         .minimumScaleFactor(0.75)
-                        .padding(.top, 24)
+                        .padding(.top, 10)
 
-                    Text("One place for shared plans, expenses, and goals—with smarter money features when you need them.")
+                    Text("From the first idea to the final split, keep the plan, the goal, and the money behind it in one place.")
                         .font(.body)
                         .foregroundStyle(PaktlyColor.secondaryInk)
                         .lineSpacing(3)

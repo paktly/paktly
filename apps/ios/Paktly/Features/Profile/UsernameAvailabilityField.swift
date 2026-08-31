@@ -28,46 +28,75 @@ struct UsernameAvailabilityField: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            TextField("Username (optional)", text: $username)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textContentType(.username)
-                .onChange(of: username) { _, value in
-                    let replacement = Self.normalize(value)
-                    if replacement != value { username = replacement }
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                TextField("Username (optional)", text: $username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textContentType(.username)
+                    .onChange(of: username) { _, value in
+                        let replacement = Self.normalize(value)
+                        if replacement != value { username = replacement }
+                    }
 
-            statusLabel
+                statusIcon
+                    .frame(width: 20, height: 20)
+                    .animation(.easeInOut(duration: 0.18), value: status)
+            }
+
+            Text(statusMessage)
+                .font(.caption)
+                .foregroundStyle(statusColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .animation(.easeInOut(duration: 0.18), value: status)
+                .accessibilityLabel(statusMessage)
         }
         .task(id: normalized) {
             await checkAvailability()
         }
     }
 
-    @ViewBuilder private var statusLabel: some View {
+    @ViewBuilder private var statusIcon: some View {
+        switch status {
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .available, .current:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(PaktlyColor.forest)
+        case .taken, .invalid, .unavailable:
+            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(PaktlyColor.coral)
+        case .optional:
+            EmptyView()
+        }
+    }
+
+    private var statusMessage: String {
         switch status {
         case .optional:
-            Text("Use 3–30 letters, numbers, or underscores.")
-                .foregroundStyle(PaktlyColor.secondaryInk)
+            "3–30 characters · spaces become underscores"
         case .checking:
-            Label("Checking availability…", systemImage: "clock")
-                .foregroundStyle(PaktlyColor.secondaryInk)
+            "Checking…"
         case .available:
-            Label("Username is available", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(PaktlyColor.forest)
+            "@\(normalized) is available"
         case .current:
-            Label("This is your current username", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(PaktlyColor.forest)
+            "Your current username"
         case .taken:
-            Label("That username is already taken", systemImage: "xmark.circle.fill")
-                .foregroundStyle(PaktlyColor.coral)
+            "That username is taken"
         case .invalid:
-            Label("Use 3–30 letters, numbers, or underscores. Start and end with a letter or number.", systemImage: "exclamationmark.circle.fill")
-                .foregroundStyle(PaktlyColor.coral)
+            "Letters or numbers at both ends · underscores inside"
         case .unavailable:
-            Label("Availability couldn’t be checked. Try again.", systemImage: "wifi.exclamationmark")
-                .foregroundStyle(PaktlyColor.coral)
+            "Couldn’t check availability · try again"
+        }
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .available, .current:
+            PaktlyColor.forest
+        case .taken, .invalid, .unavailable:
+            PaktlyColor.coral
+        case .optional, .checking:
+            PaktlyColor.secondaryInk
         }
     }
 

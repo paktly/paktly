@@ -31,7 +31,11 @@ button, input { font: inherit; }
 .nav { height: 88px; display: flex; align-items: center; justify-content: space-between; }
 .brand-link { display: inline-flex; }
 .brand-mark { display: inline-flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
-.brand-symbol { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px 12px 12px 4px; background: var(--ink); color: var(--mint); font-size: 17px; transform: rotate(-3deg); }
+.brand-symbol { display: grid; place-items: center; width: 38px; height: 38px; }
+.brand-symbol svg { width: 100%; height: 100%; overflow: visible; }
+.paktly-mark-forest { color: var(--forest); }
+.paktly-mark-coral { color: var(--coral); }
+.paktly-mark-mint { color: var(--mint); }
 .nav-links { display: flex; align-items: center; gap: 34px; font-size: 14px; font-weight: 650; }
 .nav-cta { padding: 12px 18px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.45); }
 .hero { min-height: 760px; display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 50px; padding-block: 64px 100px; }
@@ -249,7 +253,8 @@ h1 em { color: var(--mint-deep); font-weight: 500; }
 .contact-list a { font-family: Georgia,serif; font-size: 24px; color: var(--mint-deep); }
 .contact-list p { color: var(--muted); }
 .download-panel { display: grid; grid-template-columns: 220px 1fr; gap: 55px; align-items: center; padding-block: 80px; }
-.download-icon { display: grid; place-items: center; width: 210px; height: 210px; border-radius: 58px 58px 58px 20px; color: var(--mint); background: var(--ink); font-size: 92px; font-weight: 900; box-shadow: var(--shadow); }
+.download-icon { display: grid; place-items: center; width: 210px; height: 210px; border: 1px solid var(--line); border-radius: 58px; background: var(--paper); box-shadow: var(--shadow); }
+.download-icon svg { width: 72%; height: 72%; }
 .download-panel h2 { font-family: Georgia,serif; font-size: 38px; font-weight: 500; }
 .download-panel p { max-width: 680px; color: var(--muted); line-height: 1.65; }
 .error-page { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
@@ -298,7 +303,7 @@ h1 em { color: var(--mint-deep); font-weight: 500; }
   .availability-timeline article, .contact-list article { display: block; }
   .availability-timeline h2, .contact-list a { display: block; margin-top: 10px; }
   .download-panel { grid-template-columns: 1fr; }
-  .download-icon { width: 150px; height: 150px; border-radius: 42px 42px 42px 15px; font-size: 66px; }
+  .download-icon { width: 150px; height: 150px; border-radius: 42px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

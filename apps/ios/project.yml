@@ -42,12 +42,14 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIApplicationSupportsIndirectInputEvents: true
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIImageName: PaktlyMark
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.paktly.app
         DEVELOPMENT_TEAM: GC29BX444D
         CODE_SIGN_ENTITLEMENTS: Paktly/Paktly.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     scheme:
       testTargets:
         - PaktlyTests

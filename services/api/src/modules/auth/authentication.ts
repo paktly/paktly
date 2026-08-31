@@ -120,3 +120,45 @@ export async function createSocketFiSession(
     };
   });
 }
+
+export async function linkSocketFiIdentity(
+  database: Sql,
+  userId: string,
+  identity: VerifiedSocketFiIdentity
+) {
+  return database.begin(async (tx) => {
+    const [identityOwner] = await tx`
+      SELECT user_id FROM auth_identities
+      WHERE provider='SOCKETFI' AND provider_subject=${identity.subject}
+      FOR UPDATE
+    `;
+    if (identityOwner && String(identityOwner.user_id) !== userId) {
+      throw new Error("SOCKETFI_IDENTITY_IN_USE");
+    }
+    const [walletOwner] = await tx`
+      SELECT user_id FROM wallet_addresses
+      WHERE provider='SOCKETFI' AND network=${identity.network}
+        AND address=${identity.wallets[identity.network] ?? ""}
+      FOR UPDATE
+    `;
+    if (walletOwner && String(walletOwner.user_id) !== userId) {
+      throw new Error("SOCKETFI_WALLET_IN_USE");
+    }
+    await tx`
+      INSERT INTO auth_identities(id,user_id,provider,provider_subject)
+      VALUES(${randomUUID()},${userId},'SOCKETFI',${identity.subject})
+      ON CONFLICT(provider,provider_subject) DO NOTHING
+    `;
+    for (const network of ["TESTNET", "PUBLIC"] as const) {
+      const address = identity.wallets[network];
+      if (!address) continue;
+      await tx`
+        INSERT INTO wallet_addresses(id,user_id,provider,network,address)
+        VALUES(${randomUUID()},${userId},'SOCKETFI',${network},${address})
+        ON CONFLICT(user_id,provider,network)
+        DO UPDATE SET address=excluded.address,updated_at=now()
+      `;
+    }
+    return { wallet: identity.wallets[identity.network] ?? null, network: identity.network };
+  });
+}

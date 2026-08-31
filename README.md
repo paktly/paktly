@@ -54,6 +54,6 @@ The iOS project is generated with XcodeGen from `apps/ios/project.yml` and must 
 
 - Ordinary shared-expense accounting remains private and off-chain.
 - Only stored-value movements will use Stellar.
-- Passkeys are the default consumer authentication experience.
-- SocketFi remains behind the `SmartAccountService` boundary; the checked-in local build uses a development passkey/account adapter and development API session.
+- Email OTP is the default account experience; creating a Paktly account does not create a wallet.
+- SocketFi remains behind the `SmartAccountService` boundary and is invoked only for optional Smart Wallet activation or existing-wallet passkey sign-in.
 - The consumer brand is **Paktly** and the canonical public domain is **paktly.io**. Complete trademark and legal-entity review before commercial launch.

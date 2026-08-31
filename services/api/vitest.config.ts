@@ -3,7 +3,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     coverage: {
-      exclude: ["src/modules/**/routes.ts", "src/modules/auth/authentication.ts", "src/platform/database.ts"],
+      exclude: [
+        "src/modules/**/routes.ts",
+        "src/modules/auth/authentication.ts",
+        "src/modules/auth/email-otp.ts",
+        "src/platform/database.ts"
+      ],
       provider: "v8",
       reporter: ["text", "json-summary"],
       thresholds: {

@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z, type ZodType } from "zod";
 import type { Environment } from "../../config/environment.js";
-import { createDevelopmentSession, createSocketFiSession, hashToken, requireAuthentication } from "../auth/authentication.js";
+import { createDevelopmentSession, createSocketFiSession, hashToken, linkSocketFiIdentity, requireAuthentication } from "../auth/authentication.js";
+import { requestEmailOtp, verifyEmailOtp } from "../auth/email-otp.js";
 import { verifySocketFiToken } from "../auth/socketfi.js";
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
@@ -27,6 +28,44 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       if (environment.nodeEnvironment === "production") throw app.httpErrors.notFound();
       const body = parse(z.object({ email: z.string().email(), displayName: z.string().trim().min(1).max(80) }), request.body, app.httpErrors.badRequest);
       return createDevelopmentSession(app.db, body);
+    });
+
+    app.post("/auth/email/request", { config: { rateLimit: { max: 5, timeWindow: 60_000 } } }, async (request, reply) => {
+      const { email } = parse(
+        z.object({ email: z.string().trim().email().transform((value) => value.toLowerCase()) }),
+        request.body,
+        app.httpErrors.badRequest
+      );
+      try {
+        const result = await requestEmailOtp(app.db, email, environment.emailAuth ?? { enabled: false, from: "" }, environment.nodeEnvironment);
+        return reply.status(201).send({ delivery: "email", ...result });
+      } catch (error) {
+        if ((error as Error).message === "EMAIL_AUTH_DISABLED") throw app.httpErrors.serviceUnavailable("Email sign-in is not available.");
+        if ((error as Error).message === "OTP_RATE_LIMITED") throw app.httpErrors.tooManyRequests("Please wait before requesting another code.");
+        request.log.error({ err: error }, "email OTP delivery failed");
+        throw app.httpErrors.serviceUnavailable("We couldn’t send a code. Please try again.");
+      }
+    });
+
+    app.post("/auth/email/verify", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+      const body = parse(
+        z.object({
+          challengeId: z.string().uuid(),
+          email: z.string().trim().email().transform((value) => value.toLowerCase()),
+          code: z.string().regex(/^\d{6}$/)
+        }),
+        request.body,
+        app.httpErrors.badRequest
+      );
+      try {
+        return await verifyEmailOtp(app.db, body, environment.emailAuth ?? { enabled: false, from: "" });
+      } catch (error) {
+        const message = (error as Error).message;
+        if (message === "EMAIL_AUTH_DISABLED") throw app.httpErrors.serviceUnavailable("Email sign-in is not available.");
+        if (message === "OTP_EXPIRED") throw app.httpErrors.gone("This code has expired. Request a new one.");
+        if (message === "OTP_ATTEMPTS_EXCEEDED") throw app.httpErrors.tooManyRequests("Too many attempts. Request a new code.");
+        throw app.httpErrors.unauthorized("That verification code is incorrect.");
+      }
     });
 
     app.post("/auth/socketfi", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
@@ -58,6 +97,28 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
           WHERE user_id=${userId} AND provider='SOCKETFI' AND network=${environment.socketFi.network}
         `;
         return { profile: { ...profile, smartAccount: smartAccount ?? null } };
+      });
+
+      authenticated.post("/me/smart-wallet/socketfi", { config: { rateLimit: { max: 5, timeWindow: 60_000 } } }, async (request) => {
+        const { accessToken } = parse(
+          z.object({ accessToken: z.string().min(100).max(16_384) }),
+          request.body,
+          app.httpErrors.badRequest
+        );
+        let identity;
+        try {
+          identity = await verifySocketFiToken(accessToken, environment.socketFi);
+        } catch {
+          throw app.httpErrors.unauthorized("SocketFi wallet authorization is invalid or expired.");
+        }
+        try {
+          return await linkSocketFiIdentity(app.db, request.authenticatedUser!.id, identity);
+        } catch (error) {
+          if (["SOCKETFI_IDENTITY_IN_USE", "SOCKETFI_WALLET_IN_USE"].includes((error as Error).message)) {
+            throw app.httpErrors.conflict("This smart wallet is already linked to another Paktly account.");
+          }
+          throw error;
+        }
       });
 
       authenticated.patch("/me", async (request) => {

@@ -7,6 +7,7 @@ struct ProfileView: View {
     @State private var username = ""
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showingWalletActivation = false
 
     private var normalizedUsername: String? {
         let value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -93,9 +94,14 @@ struct ProfileView: View {
                                     .textSelection(.enabled)
                             }
                         } else {
-                            Label("Smart account is being prepared", systemImage: "hourglass")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            VStack(alignment: .leading, spacing: 14) {
+                                Label("Unlock Paktly Smart", systemImage: "sparkles")
+                                    .font(.headline).foregroundStyle(PaktlyColor.ink)
+                                Text("Activate a passkey-protected smart wallet when you’re ready to save, contribute, and access eligible payment features.")
+                                    .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                                Button("Activate Smart Wallet") { showingWalletActivation = true }
+                                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                            }
                         }
                     }
 
@@ -103,13 +109,17 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Security").font(.headline).foregroundStyle(PaktlyColor.ink)
                             HStack(spacing: 12) {
-                                Image(systemName: "faceid")
+                                Image(systemName: model.currentUser?.smartAccount == nil ? "envelope.badge.shield.half.filled" : "person.badge.key.fill")
                                     .foregroundStyle(PaktlyColor.forest)
                                     .frame(width: 38, height: 38)
                                     .background(PaktlyColor.mint.opacity(0.35), in: Circle())
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("Passkey protected").font(.subheadline.weight(.semibold))
-                                    Text("Your device securely authorizes access.").font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                                    Text(model.currentUser?.smartAccount == nil ? "Email verified" : "Wallet passkey active")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(model.currentUser?.smartAccount == nil
+                                         ? "Your Paktly account uses secure email codes."
+                                         : "Your device securely authorizes wallet actions.")
+                                        .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
                                 }
                             }
                         }
@@ -129,6 +139,16 @@ struct ProfileView: View {
             .background(PaktlyColor.background.ignoresSafeArea())
             .navigationBarHidden(true)
             .task(id: model.currentUser?.id) { loadProfile() }
+            .sheet(isPresented: $showingWalletActivation) {
+                SmartWalletActivationView(
+                    suggestedUsername: model.currentUser?.username ?? PaktlySmartUsername.make()
+                ) {
+                    await model.refresh()
+                    showingWalletActivation = false
+                }
+                .environmentObject(session)
+                .presentationDetents([.large])
+            }
         }
     }
 
@@ -169,5 +189,89 @@ struct ProfileView: View {
         } catch {
             saveError = "We couldn’t save your Paktly profile. Check that the username is available."
         }
+    }
+}
+
+private struct SmartWalletActivationView: View {
+    @EnvironmentObject private var session: AppSession
+    @Environment(\.dismiss) private var dismiss
+    @State var suggestedUsername: String
+    let completed: () async -> Void
+
+    private var normalized: String {
+        suggestedUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var valid: Bool {
+        normalized.range(of: #"^[a-z0-9](?:[a-z0-9_\-]{1,28}[a-z0-9])$"#, options: .regularExpression) != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Activate Paktly Smart")
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        Text("Your everyday Paktly account stays the same. This adds a separate smart wallet protected by a passkey.")
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                    }
+                    PaktlyPanel {
+                        VStack(alignment: .leading, spacing: 15) {
+                            capability("Smart Wallet", "Hold supported digital-dollar balances.", "wallet.bifold")
+                            capability("Smart Savings", "Put real funds toward shared goals.", "chart.line.uptrend.xyaxis")
+                            capability("Eligible payments", "Access supported cards and payments when available in your region.", "creditcard")
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Passkey label").font(.caption.weight(.semibold)).foregroundStyle(PaktlyColor.secondaryInk)
+                        TextField("paktly_sunny_otter_4821", text: $suggestedUsername)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .font(.body.monospaced()).padding(15)
+                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        Text("This labels the passkey on your device. Your Paktly profile can still be edited separately.")
+                            .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                    }
+                    if let message = session.walletActivationError {
+                        Text(message).font(.footnote).foregroundStyle(PaktlyColor.coral)
+                    }
+                    Button {
+                        Task {
+                            if await session.activateSmartWallet(username: normalized) { await completed() }
+                        }
+                    } label: {
+                        HStack {
+                            if session.isActivatingWallet { ProgressView().tint(PaktlyColor.background) }
+                            Text(session.isActivatingWallet ? "Activating…" : "Create passkey and activate")
+                        }
+                    }
+                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                    .disabled(!valid || session.isActivatingWallet)
+                    Text("Wallet availability, funding, and card access may require identity verification and regional eligibility.")
+                        .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                }
+                .padding(24)
+            }
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .toolbar { Button("Close") { dismiss() }.disabled(session.isActivatingWallet) }
+            .interactiveDismissDisabled(session.isActivatingWallet)
+        }
+    }
+
+    private func capability(_ title: String, _ message: String, _ icon: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).foregroundStyle(PaktlyColor.forest).frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(message).font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+            }
+        }
+    }
+}
+
+private enum PaktlySmartUsername {
+    static func make() -> String {
+        let words = ["bright", "calm", "kind", "lucky", "sunny", "swift"]
+        return "paktly_\(words.randomElement() ?? "smart")_\(Int.random(in: 1000...9999))"
     }
 }

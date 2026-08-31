@@ -23,6 +23,10 @@ const environmentSchema = z.object({
   SOCKETFI_ISSUER: z.string().url().default("https://socket.fi"),
   SOCKETFI_ORIGIN: z.string().url().default("https://socket.fi"),
   SOCKETFI_NETWORK: z.enum(["TESTNET", "PUBLIC"]).default("TESTNET"),
+  EMAIL_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  EMAIL_OTP_SECRET: z.string().min(32).optional(),
+  RESEND_API_KEY: z.string().min(10).optional(),
+  EMAIL_FROM: z.string().default("Paktly <hello@paktly.io>"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -43,6 +47,12 @@ export type Environment = {
     issuer: string;
     origin: string;
     network: "TESTNET" | "PUBLIC";
+  };
+  emailAuth?: {
+    enabled: boolean;
+    otpSecret?: string;
+    resendApiKey?: string;
+    from: string;
   };
 };
 
@@ -87,6 +97,11 @@ export function loadEnvironment(
         "Invalid environment configuration: SOCKETFI_CLIENT_ID and SOCKETFI_CLIENT_SECRET are required in production"
       );
     }
+    if (parsed.data.EMAIL_AUTH_ENABLED && (!source.EMAIL_OTP_SECRET || !source.RESEND_API_KEY)) {
+      throw new Error(
+        "Invalid environment configuration: EMAIL_OTP_SECRET and RESEND_API_KEY are required when email authentication is enabled"
+      );
+    }
   }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
@@ -113,6 +128,12 @@ export function loadEnvironment(
       issuer: parsed.data.SOCKETFI_ISSUER,
       origin: parsed.data.SOCKETFI_ORIGIN,
       network: parsed.data.SOCKETFI_NETWORK
+    },
+    emailAuth: {
+      enabled: parsed.data.EMAIL_AUTH_ENABLED,
+      ...(parsed.data.EMAIL_OTP_SECRET ? { otpSecret: parsed.data.EMAIL_OTP_SECRET } : {}),
+      ...(parsed.data.RESEND_API_KEY ? { resendApiKey: parsed.data.RESEND_API_KEY } : {}),
+      from: parsed.data.EMAIL_FROM
     }
   };
 }

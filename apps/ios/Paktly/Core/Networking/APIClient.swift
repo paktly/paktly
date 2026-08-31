@@ -62,6 +62,17 @@ private struct SocketFiSessionResponse: Decodable {
     let user: APIUser
 }
 
+private struct EmailOTPRequest: Encodable { let email: String }
+private struct EmailOTPChallengeResponse: Decodable { let challengeId: String; let expiresAt: Date }
+private struct EmailOTPVerifyRequest: Encodable { let challengeId: String; let email: String; let code: String }
+private struct EmailOTPSessionResponse: Decodable {
+    let accessToken: String
+    let isNewUser: Bool
+    let user: APIUser
+}
+private struct LinkSmartWalletRequest: Encodable { let accessToken: String }
+private struct LinkSmartWalletResponse: Decodable { let wallet: String?; let network: String }
+
 private struct ProfilePayload: Decodable {
     let id: String
     let email: String
@@ -240,6 +251,38 @@ actor APIClient {
         )
         try KeychainTokenStore.save(response.accessToken)
         return response.user
+    }
+
+    func requestEmailOTP(email: String) async throws -> (challengeId: String, expiresAt: Date) {
+        let response = try await send(
+            EmailOTPChallengeResponse.self,
+            path: "auth/email/request",
+            method: "POST",
+            body: EmailOTPRequest(email: email),
+            authenticated: false
+        )
+        return (response.challengeId, response.expiresAt)
+    }
+
+    func verifyEmailOTP(challengeId: String, email: String, code: String) async throws -> (APIUser, Bool) {
+        let response = try await send(
+            EmailOTPSessionResponse.self,
+            path: "auth/email/verify",
+            method: "POST",
+            body: EmailOTPVerifyRequest(challengeId: challengeId, email: email, code: code),
+            authenticated: false
+        )
+        try KeychainTokenStore.save(response.accessToken)
+        return (response.user, response.isNewUser)
+    }
+
+    func linkSmartWallet(socketFiAccessToken: String) async throws {
+        _ = try await send(
+            LinkSmartWalletResponse.self,
+            path: "me/smart-wallet/socketfi",
+            method: "POST",
+            body: LinkSmartWalletRequest(accessToken: socketFiAccessToken)
+        )
     }
 
     func groups() async throws -> [APIGroup] {

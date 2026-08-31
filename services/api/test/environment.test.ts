@@ -8,6 +8,10 @@ describe("loadEnvironment", () => {
       apiPort: 4000,
       corsOrigins: ["http://localhost:3000"],
       databaseUrl: "postgres://pakt:pakt_local_only@localhost:56432/pakt",
+      emailAuth: {
+        enabled: false,
+        from: "Paktly <hello@paktly.io>"
+      },
       logLevel: "info",
       nodeEnvironment: "development",
       rateLimitMax: 300,
@@ -60,5 +64,16 @@ describe("loadEnvironment", () => {
         CORS_ORIGINS: "http://paktly.io"
       })
     ).toThrow("must use HTTPS");
+  });
+
+  it("requires OTP and delivery secrets only when production email auth is enabled", () => {
+    expect(() => loadEnvironment({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://user:pass@postgres/db",
+      CORS_ORIGINS: "https://paktly.io",
+      SOCKETFI_CLIENT_ID: "paktly-client",
+      SOCKETFI_CLIENT_SECRET: "a-secure-socketfi-secret",
+      EMAIL_AUTH_ENABLED: "true"
+    })).toThrow("EMAIL_OTP_SECRET and RESEND_API_KEY");
   });
 });

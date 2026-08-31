@@ -16,7 +16,7 @@ Production deployments must supply validated configuration through the platform 
 
 The Contabo/VPS deployment stack, reverse-proxy examples, backup timer, rollout, and rollback procedures are documented in [`infrastructure/production/README.md`](../infrastructure/production/README.md). The default stack binds the API only to loopback and does not publish PostgreSQL or Redis.
 
-Production authentication is a launch gate: the development session endpoint is disabled in production. SocketFi identity verification must be integrated from its production server-verification contract before authenticated users are admitted.
+Production authentication is a launch gate: the development session endpoint is disabled in production. Enable email authentication with `EMAIL_AUTH_ENABLED=true`, a high-entropy `EMAIL_OTP_SECRET`, a Resend API key, and a sender on a verified domain. SocketFi verification remains required for passkey sign-in and Smart Wallet linking; never place either provider secret in the iOS app.
 
 ## Web
 

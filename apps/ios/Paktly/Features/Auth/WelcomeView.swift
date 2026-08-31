@@ -1,5 +1,4 @@
 import AuthenticationServices
-import GoogleSignInSwift
 import SwiftUI
 
 struct WelcomeView: View {
@@ -89,10 +88,36 @@ struct WelcomeView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .disabled(session.state == .authenticating)
 
-            GoogleSignInButton(scheme: .light, style: .wide) {
+            Button {
                 Task { await session.signInWithGoogle() }
+            } label: {
+                ZStack {
+                    HStack {
+                        Image("GoogleG")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 18)
+
+                    if session.state == .authenticating {
+                        ProgressView().tint(Color(red: 0.12, green: 0.12, blue: 0.12))
+                    } else {
+                        Text("Continue with Google")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color(red: 0.12, green: 0.12, blue: 0.12))
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54)
+                .background(Color.white)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color(red: 0.45, green: 0.47, blue: 0.46).opacity(0.42), lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .frame(height: 54)
+            .buttonStyle(.plain)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .disabled(session.state == .authenticating)
             .accessibilityIdentifier("GoogleSignInButton")

@@ -80,6 +80,16 @@ describe("SocketFi token verification", () => {
     );
   });
 
+  it("exposes the project-scoped username separately from SocketFi's internal username", async () => {
+    mockKey();
+    const result = await verifySocketFiToken(
+      await token({ username: "paktly-alex--internal-id", projectUsername: "paktly_alex" }),
+      config
+    );
+    expect(result.username).toBe("paktly-alex--internal-id");
+    expect(result.projectUsername).toBe("paktly_alex");
+  });
+
   it.each([
     ["type", "socketfi_auth"],
     ["clientId", "other"],

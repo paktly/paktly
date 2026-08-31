@@ -4,6 +4,8 @@ The native client targets iOS 17 and talks to the persisted `/api/v1` service. I
 
 Device, simulator, Debug, and Release builds use `https://api.paktly.io/api/v1`. Generate the project with `xcodegen generate`, then run the `Paktly` scheme. Authentication uses SocketFi's native TESTNET protocol and Apple's passkey UI; it does not open hosted auth. Physical-device testing requires the `socket.fi` Apple App Site Association deployment to list `GC29BX444D.io.paktly.app` and the generated target to retain `webcredentials:socket.fi`.
 
+During native signup, Paktly suggests an editable `paktly_…` project username and sends it to SocketFi before requesting the passkey. SocketFi uses that readable name as the passkey label and returns `USERNAME_TAKEN` when it is already used within the Paktly project. SocketFi's opaque global identity remains separate from the username shown in Paktly.
+
 The generated application Info.plist explicitly supplies the production API URL so device and test-host builds cannot silently fall back to localhost.
 
 Native SwiftUI shell targeting iOS 17 and later. Xcode project files are generated from `project.yml` so project settings remain reviewable.

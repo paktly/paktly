@@ -45,7 +45,8 @@ export async function createSocketFiSession(
   const token = randomBytes(32).toString("base64url");
   const subjectHash = hashToken(identity.subject).slice(0, 32);
   const syntheticEmail = `socketfi+${subjectHash}@users.paktly.invalid`;
-  const safeDisplayName = displayName?.trim() || "Paktly member";
+  const safeProjectUsername = identity.projectUsername?.trim().toLowerCase();
+  const safeDisplayName = displayName?.trim() || safeProjectUsername || "Paktly member";
 
   return database.begin(async (tx) => {
     const [existing] = await tx`
@@ -69,15 +70,20 @@ export async function createSocketFiSession(
         ON CONFLICT(provider,provider_subject) DO NOTHING
       `;
       await tx`
-        INSERT INTO user_profiles(user_id,display_name) VALUES(${String(user.id)},${safeDisplayName})
+        INSERT INTO user_profiles(user_id,display_name,username)
+        VALUES(${String(user.id)},${safeDisplayName},${safeProjectUsername ?? null})
         ON CONFLICT(user_id) DO NOTHING
       `;
-    } else if (
-      displayName?.trim() ||
-      (identity.username && String(user.display_name) === identity.username)
-    ) {
+    } else if (displayName?.trim()) {
       await tx`
         UPDATE user_profiles SET display_name=${safeDisplayName},updated_at=now()
+        WHERE user_id=${String(user.id)}
+      `;
+    } else if (safeProjectUsername) {
+      await tx`
+        UPDATE user_profiles SET
+          display_name=CASE WHEN display_name='Paktly member' OR display_name LIKE 'socketfi-%' THEN ${safeProjectUsername} ELSE display_name END,
+          username=COALESCE(username,${safeProjectUsername}),updated_at=now()
         WHERE user_id=${String(user.id)}
       `;
     }

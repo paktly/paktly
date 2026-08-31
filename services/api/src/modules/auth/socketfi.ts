@@ -6,6 +6,7 @@ type CachedKey = { key: CryptoKey; expiresAt: number; kid?: string };
 export type VerifiedSocketFiIdentity = {
   subject: string;
   username?: string;
+  projectUsername?: string;
   wallets: Partial<Record<"TESTNET" | "PUBLIC", string>>;
   network: "TESTNET" | "PUBLIC";
 };
@@ -65,6 +66,9 @@ function normalize(payload: JWTPayload, config: Environment["socketFi"]): Verifi
   return {
     subject: payload.sub,
     ...(typeof payload.username === "string" ? { username: payload.username } : {}),
+    ...(typeof payload.projectUsername === "string"
+      ? { projectUsername: payload.projectUsername }
+      : {}),
     wallets,
     network: config.network
   };

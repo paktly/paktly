@@ -27,7 +27,7 @@ struct AuthorizedTransaction: Sendable {
 
 @MainActor
 protocol SmartAccountService: AnyObject, Sendable {
-    func authenticate(mode: SmartAccountAuthenticationMode) async throws -> SmartAccountSession
+    func authenticate(mode: SmartAccountAuthenticationMode, username: String?) async throws -> SmartAccountSession
     func currentAccount() async throws -> SmartAccount
     func authorizeTransaction(_ request: TransactionRequest) async throws -> AuthorizedTransaction
     func signOut() async
@@ -38,7 +38,7 @@ protocol SmartAccountService: AnyObject, Sendable {
 final class PreviewSmartAccountService: SmartAccountService, @unchecked Sendable {
     private var account: SmartAccount?
 
-    func authenticate(mode: SmartAccountAuthenticationMode) async throws -> SmartAccountSession {
+    func authenticate(mode: SmartAccountAuthenticationMode, username: String? = nil) async throws -> SmartAccountSession {
         try await Task.sleep(for: .milliseconds(450))
         let account = SmartAccount(id: "demo-account", displayAddress: "G…PAKTLY")
         self.account = account

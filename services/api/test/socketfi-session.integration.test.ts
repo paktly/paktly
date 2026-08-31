@@ -81,4 +81,26 @@ suite("SocketFi identity persistence", () => {
       }
     });
   });
+
+  it("uses a SocketFi project username as the editable initial Paktly username", async () => {
+    const suffix = randomUUID().replaceAll("-", "").slice(0, 8);
+    const projectUsername = `paktly_user_${suffix}`;
+    const session = await createSocketFiSession(app.db, {
+      subject: `socketfi-project-user-${randomUUID()}`,
+      username: `${projectUsername}--internal-id`,
+      projectUsername,
+      wallets: { TESTNET: `CPROJECTUSER${suffix.toUpperCase()}` },
+      network: "TESTNET"
+    });
+    const profile = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: { authorization: `Bearer ${session.accessToken}` }
+    });
+    expect(profile.statusCode).toBe(200);
+    expect(profile.json().profile).toMatchObject({
+      display_name: projectUsername,
+      username: projectUsername
+    });
+  });
 });

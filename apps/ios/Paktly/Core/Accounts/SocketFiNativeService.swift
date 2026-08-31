@@ -36,6 +36,7 @@ private struct NativeStartRequest: Encodable {
     let platform = "ios"
     let network: String
     let mode: String
+    let username: String?
 }
 
 private struct NativeStartResponse: Decodable {
@@ -121,6 +122,7 @@ private enum SocketFiNativeError: LocalizedError {
     case invalidResponse
     case unsupportedCredential
     case requestFailed(Int, String)
+    case usernameTaken
 
     var errorDescription: String? {
         switch self {
@@ -128,6 +130,7 @@ private enum SocketFiNativeError: LocalizedError {
         case .invalidResponse: "SocketFi returned an incomplete authentication response."
         case .unsupportedCredential: "This device did not return a supported passkey credential."
         case let .requestFailed(_, message): message
+        case .usernameTaken: "That username is already taken. Try another one."
         }
     }
 }
@@ -147,7 +150,7 @@ final class SocketFiNativeSmartAccountService: NSObject, SmartAccountService, @u
         super.init()
     }
 
-    func authenticate(mode: SmartAccountAuthenticationMode) async throws -> SmartAccountSession {
+    func authenticate(mode: SmartAccountAuthenticationMode, username: String? = nil) async throws -> SmartAccountSession {
         let start = try await post(
             NativeStartResponse.self,
             path: "api/native/auth/start",
@@ -155,7 +158,8 @@ final class SocketFiNativeSmartAccountService: NSObject, SmartAccountService, @u
                 clientId: configuration.clientID,
                 applicationId: configuration.applicationID,
                 network: configuration.network,
-                mode: mode.rawValue
+                mode: mode.rawValue,
+                username: username
             )
         )
         let request = AuthOptionsRequest(
@@ -356,8 +360,11 @@ final class SocketFiNativeSmartAccountService: NSObject, SmartAccountService, @u
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let message = (try? JSONDecoder().decode(SocketFiErrorResponse.self, from: data).error)
-                ?? "SocketFi authentication failed."
+            let apiError = try? JSONDecoder().decode(SocketFiErrorResponse.self, from: data)
+            if status == 409, apiError?.code == "USERNAME_TAKEN" {
+                throw SocketFiNativeError.usernameTaken
+            }
+            let message = apiError?.error ?? "SocketFi authentication failed."
             throw SocketFiNativeError.requestFailed(status, message)
         }
         return try JSONDecoder().decode(responseType, from: data)
@@ -432,6 +439,7 @@ private struct VerifyRequest<Credential: Encodable>: Encodable {
 
 private struct SocketFiErrorResponse: Decodable {
     let error: String
+    let code: String?
 }
 
 private struct NativeTransactionPayload: Decodable {

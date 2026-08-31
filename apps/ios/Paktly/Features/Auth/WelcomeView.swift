@@ -234,6 +234,7 @@ struct ProfileSetupView: View {
     @EnvironmentObject private var session: AppSession
     @State private var displayName = ""
     @State private var username = ""
+    @State private var usernameStatus: UsernameAvailabilityField.Status = .optional
 
     private var normalizedUsername: String? {
         let value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -252,8 +253,11 @@ struct ProfileSetupView: View {
                 TextField("Your name", text: $displayName)
                     .textContentType(.name).textInputAutocapitalization(.words)
                 Divider()
-                TextField("Username (optional)", text: $username)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                UsernameAvailabilityField(
+                    username: $username,
+                    currentUsername: nil,
+                    status: $usernameStatus
+                )
             }
             .padding(17)
             .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -267,7 +271,11 @@ struct ProfileSetupView: View {
                 Text(session.state == .authenticating ? "Saving…" : "Enter Paktly")
             }
             .buttonStyle(PaktlyPrimaryButtonStyle())
-            .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || session.state == .authenticating)
+            .disabled(
+                displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    session.state == .authenticating ||
+                    !usernameStatus.permitsSaving
+            )
             Spacer()
         }
         .padding(24)

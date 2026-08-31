@@ -74,6 +74,10 @@ final class AppSession: ObservableObject {
         }
     }
 
+    func usernameAvailability(_ username: String) async throws -> UsernameAvailabilityResponse {
+        try await apiClient.usernameAvailability(username)
+    }
+
     func activateSmartWallet(username: String?) async -> Bool {
         guard !isActivatingWallet else { return false }
         isActivatingWallet = true

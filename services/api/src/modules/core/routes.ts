@@ -6,6 +6,7 @@ import { createDevelopmentSession, createSocketFiSession, hashToken, linkSocketF
 import { requestEmailOtp, verifyEmailOtp } from "../auth/email-otp.js";
 import { SmtpEmailProvider } from "../auth/email-provider.js";
 import { verifySocketFiToken } from "../auth/socketfi.js";
+import { isValidUsername, normalizeUsername } from "../auth/username.js";
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
 const uuid = z.string().uuid();
@@ -109,6 +110,24 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         return { profile: { ...profile, smartAccount: smartAccount ?? null } };
       });
 
+      authenticated.post("/me/username-availability", { config: { rateLimit: { max: 30, timeWindow: 60_000 } } }, async (request) => {
+        const { username: rawUsername } = parse(
+          z.object({ username: z.string().max(100) }),
+          request.body,
+          app.httpErrors.badRequest
+        );
+        const username = normalizeUsername(rawUsername);
+        if (!isValidUsername(username)) {
+          return { username, available: false, reason: "INVALID" };
+        }
+        const [owner] = await app.db`
+          SELECT user_id FROM user_profiles
+          WHERE username=${username} AND user_id<>${request.authenticatedUser!.id}
+          LIMIT 1
+        `;
+        return { username, available: !owner, reason: owner ? "TAKEN" : null };
+      });
+
       authenticated.post("/me/smart-wallet/socketfi", { config: { rateLimit: { max: 5, timeWindow: 60_000 } } }, async (request) => {
         const { accessToken } = parse(
           z.object({ accessToken: z.string().min(100).max(16_384) }),
@@ -132,17 +151,24 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       });
 
       authenticated.patch("/me", async (request) => {
-        const body = parse(z.object({ displayName: z.string().trim().min(1).max(80).optional(), username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/, "Use 3–30 lowercase letters, numbers, or underscores.").nullable().optional(), avatarUrl: z.string().url().nullable().optional(), defaultCurrency: currency.optional(), locale: z.string().min(2).max(20).optional(), timezone: z.string().min(1).max(80).optional() }), request.body, app.httpErrors.badRequest);
+        const body = parse(z.object({ displayName: z.string().trim().min(1).max(80).optional(), username: z.string().transform(normalizeUsername).refine(isValidUsername, "Use 3–30 letters, numbers, or underscores, beginning and ending with a letter or number.").nullable().optional(), avatarUrl: z.string().url().nullable().optional(), defaultCurrency: currency.optional(), locale: z.string().min(2).max(20).optional(), timezone: z.string().min(1).max(80).optional() }), request.body, app.httpErrors.badRequest);
         const userId = request.authenticatedUser!.id;
-        const [profile] = await app.db`
-          UPDATE user_profiles SET
-            display_name=COALESCE(${body.displayName ?? null},display_name), username=CASE WHEN ${body.username === undefined} THEN username ELSE ${body.username ?? null} END,
-            avatar_url=CASE WHEN ${body.avatarUrl === undefined} THEN avatar_url ELSE ${body.avatarUrl ?? null} END,
-            default_currency=COALESCE(${body.defaultCurrency ?? null},default_currency), locale=COALESCE(${body.locale ?? null},locale),
-            timezone=COALESCE(${body.timezone ?? null},timezone),updated_at=now()
-          WHERE user_id=${userId} RETURNING *
-        `;
-        return { profile };
+        try {
+          const [profile] = await app.db`
+            UPDATE user_profiles SET
+              display_name=COALESCE(${body.displayName ?? null},display_name), username=CASE WHEN ${body.username === undefined} THEN username ELSE ${body.username ?? null} END,
+              avatar_url=CASE WHEN ${body.avatarUrl === undefined} THEN avatar_url ELSE ${body.avatarUrl ?? null} END,
+              default_currency=COALESCE(${body.defaultCurrency ?? null},default_currency), locale=COALESCE(${body.locale ?? null},locale),
+              timezone=COALESCE(${body.timezone ?? null},timezone),updated_at=now()
+            WHERE user_id=${userId} RETURNING *
+          `;
+          return { profile };
+        } catch (error) {
+          if ((error as { code?: string }).code === "23505") {
+            throw app.httpErrors.conflict("That username is already taken.");
+          }
+          throw error;
+        }
       });
 
       authenticated.post("/groups", async (request, reply) => {

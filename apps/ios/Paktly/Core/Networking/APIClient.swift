@@ -72,6 +72,12 @@ private struct EmailOTPSessionResponse: Decodable {
 }
 private struct LinkSmartWalletRequest: Encodable { let accessToken: String }
 private struct LinkSmartWalletResponse: Decodable { let wallet: String?; let network: String }
+private struct UsernameAvailabilityRequest: Encodable { let username: String }
+struct UsernameAvailabilityResponse: Decodable, Sendable {
+    let username: String
+    let available: Bool
+    let reason: String?
+}
 
 private struct ProfilePayload: Decodable {
     let id: String
@@ -308,6 +314,15 @@ actor APIClient {
             path: "me",
             method: "PATCH",
             body: body
+        )
+    }
+
+    func usernameAvailability(_ username: String) async throws -> UsernameAvailabilityResponse {
+        try await send(
+            UsernameAvailabilityResponse.self,
+            path: "me/username-availability",
+            method: "POST",
+            body: UsernameAvailabilityRequest(username: username)
         )
     }
 

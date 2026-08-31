@@ -11,11 +11,12 @@ Authentication routes:
 
 `POST /auth/socketfi` accepts a SocketFi access token from the native passkey flow and returns a Paktly access token. The backend verifies the SocketFi RS256 signature and its issuer, audience, client ID, native origin, network, subject, and expiration. SocketFi identities are stored separately from Paktly sessions; wallet addresses are network-specific. Never send `SOCKETFI_CLIENT_SECRET` to the iOS app.
 
-Paktly profile identity is independent from SocketFi's internal username. `GET /me` returns the user's Paktly display name, optional Paktly username, and the active network's linked SocketFi smart-account address. `PATCH /me` owns Paktly username changes and accepts lowercase letters, numbers, and underscores only.
+Paktly profile identity is independent from SocketFi's internal username. `GET /me` returns the user's Paktly display name, optional Paktly username, and the active network's linked SocketFi smart-account address. `PATCH /me` owns Paktly username changes, lowercases them, and converts whitespace to underscores. `POST /me/username-availability` provides rate-limited, authenticated availability checks while excluding the caller's current username.
 
 Core routes:
 
 - `GET/PATCH /me`
+- `POST /me/username-availability`
 - `POST /auth/email/request`
 - `POST /auth/email/verify`
 - `POST /auth/socketfi`

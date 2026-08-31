@@ -26,8 +26,13 @@ suite("expense-sharing MVP end to end", () => {
   function auth(name: string) { return { authorization: `Bearer ${sessions.get(name)!.token}` }; }
 
   it("creates profiles, plans, invitations and memberships", async () => {
-    const profile = await app.inject({ method: "PATCH", url: "/api/v1/me", headers: auth("alice"), payload: { username: "alice", defaultCurrency: "usd" } });
+    const initiallyAvailable = await app.inject({ method: "POST", url: "/api/v1/me/username-availability", headers: auth("alice"), payload: { username: "Alice On Tour" } });
+    expect(initiallyAvailable.json()).toEqual({ username: "alice_on_tour", available: true, reason: null });
+    const profile = await app.inject({ method: "PATCH", url: "/api/v1/me", headers: auth("alice"), payload: { username: "Alice On Tour", defaultCurrency: "usd" } });
     expect(profile.statusCode).toBe(200);
+    expect(profile.json().profile.username).toBe("alice_on_tour");
+    const taken = await app.inject({ method: "POST", url: "/api/v1/me/username-availability", headers: auth("bob"), payload: { username: "alice on tour" } });
+    expect(taken.json()).toEqual({ username: "alice_on_tour", available: false, reason: "TAKEN" });
     const created = await app.inject({ method: "POST", url: "/api/v1/groups", headers: auth("alice"), payload: { name: "Shared summer", description: "Not only a trip", defaultCurrency: "USD" } });
     expect(created.statusCode).toBe(201); groupId = created.json().group.id;
     for (const name of ["bob", "charlie"]) {

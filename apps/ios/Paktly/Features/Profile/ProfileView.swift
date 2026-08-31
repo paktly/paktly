@@ -8,6 +8,7 @@ struct ProfileView: View {
     @State private var isSaving = false
     @State private var saveError: String?
     @State private var showingWalletActivation = false
+    @State private var usernameStatus: UsernameAvailabilityField.Status = .optional
 
     private var normalizedUsername: String? {
         let value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -34,10 +35,15 @@ struct ProfileView: View {
 
                             Divider()
 
-                            LabeledContent("Username") {
-                                TextField("Username", text: $username)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("Username")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(PaktlyColor.secondaryInk)
+                                UsernameAvailabilityField(
+                                    username: $username,
+                                    currentUsername: model.currentUser?.username,
+                                    status: $usernameStatus
+                                )
                             }
 
                             if
@@ -67,7 +73,8 @@ struct ProfileView: View {
                             .disabled(
                                 isSaving ||
                                     displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                    !hasProfileChanges
+                                    !hasProfileChanges ||
+                                    !usernameStatus.permitsSaving
                             )
 
                             if let saveError {
@@ -173,6 +180,7 @@ struct ProfileView: View {
     private func loadProfile() {
         displayName = model.currentUser?.displayName ?? ""
         username = model.currentUser?.username ?? ""
+        usernameStatus = model.currentUser?.username == nil ? .optional : .current
     }
 
     private func saveProfile() async {

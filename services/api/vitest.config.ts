@@ -7,6 +7,7 @@ export default defineConfig({
         "src/modules/**/routes.ts",
         "src/modules/auth/authentication.ts",
         "src/modules/auth/email-otp.ts",
+        "src/modules/auth/federated.ts",
         "src/platform/database.ts"
       ],
       provider: "v8",

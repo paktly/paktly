@@ -18,6 +18,8 @@ The Contabo/VPS deployment stack, reverse-proxy examples, backup timer, rollout,
 
 Production authentication is a launch gate: the development session endpoint is disabled in production. Email OTP uses the provider-neutral `SmtpEmailProvider` backed by Nodemailer and Zoho Mail or ZeptoMail SMTP. Enable it with `EMAIL_AUTH_ENABLED=true`, a high-entropy `EMAIL_OTP_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and a matching sender on a verified domain. Use a Zoho application-specific password when two-factor authentication is enabled. SocketFi verification remains required for Smart Wallet linking; never place SMTP or SocketFi credentials in the iOS app.
 
+Apple authentication requires the Sign in with Apple capability on App ID `io.paktly.app`, `APPLE_AUTH_ENABLED=true`, and `APPLE_CLIENT_ID=io.paktly.app`. Google authentication requires an iOS OAuth client for the bundle ID, a separate web OAuth client for backend token audience verification, their values in `apps/ios/project.yml`, and the same web client ID in `GOOGLE_SERVER_CLIENT_ID`. The reversed iOS client ID must be registered as the app URL scheme. Provider options must not be enabled in production until these identifiers are real and matching.
+
 ## Web
 
 The public content is statically rendered, while `/api/waitlist` is a server route backed by PostgreSQL. Apply the consent-table migration before serving traffic:

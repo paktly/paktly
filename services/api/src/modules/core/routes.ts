@@ -7,6 +7,7 @@ import { requestEmailOtp, verifyEmailOtp } from "../auth/email-otp.js";
 import { SmtpEmailProvider } from "../auth/email-provider.js";
 import { verifySocketFiToken } from "../auth/socketfi.js";
 import { isValidUsername, normalizeUsername } from "../auth/username.js";
+import { createFederatedSession, verifyAppleIdentityToken, verifyGoogleIdentityToken } from "../auth/federated.js";
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
 const uuid = z.string().uuid();
@@ -76,6 +77,60 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         if (message === "OTP_EXPIRED") throw app.httpErrors.gone("This code has expired. Request a new one.");
         if (message === "OTP_ATTEMPTS_EXCEEDED") throw app.httpErrors.tooManyRequests("Too many attempts. Request a new code.");
         throw app.httpErrors.unauthorized("That verification code is incorrect.");
+      }
+    });
+
+    app.post("/auth/apple", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+      const body = parse(
+        z.object({
+          identityToken: z.string().min(100).max(16_384),
+          nonce: z.string().min(32).max(256),
+          displayName: z.string().trim().min(1).max(80).optional()
+        }),
+        request.body,
+        app.httpErrors.badRequest
+      );
+      try {
+        const identity = await verifyAppleIdentityToken(
+          body.identityToken,
+          body.nonce,
+          environment.appleAuth ?? { enabled: false, clientId: "io.paktly.app" },
+          body.displayName
+        );
+        return await createFederatedSession(app.db, identity);
+      } catch (error) {
+        if ((error as Error).message === "APPLE_AUTH_DISABLED") {
+          throw app.httpErrors.serviceUnavailable("Apple sign-in is not available.");
+        }
+        if ((error as Error).message === "FEDERATED_ASSERTION_REPLAYED") {
+          throw app.httpErrors.conflict("This Apple authorization was already used. Please try again.");
+        }
+        request.log.warn({ err: error }, "Apple identity verification failed");
+        throw app.httpErrors.unauthorized("Apple authentication is invalid or expired.");
+      }
+    });
+
+    app.post("/auth/google", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+      const { identityToken } = parse(
+        z.object({ identityToken: z.string().min(100).max(16_384) }),
+        request.body,
+        app.httpErrors.badRequest
+      );
+      try {
+        const identity = await verifyGoogleIdentityToken(
+          identityToken,
+          environment.googleAuth ?? { enabled: false, serverClientId: "not-configured" }
+        );
+        return await createFederatedSession(app.db, identity);
+      } catch (error) {
+        if ((error as Error).message === "GOOGLE_AUTH_DISABLED") {
+          throw app.httpErrors.serviceUnavailable("Google sign-in is not available.");
+        }
+        if ((error as Error).message === "FEDERATED_ASSERTION_REPLAYED") {
+          throw app.httpErrors.conflict("This Google authorization was already used. Please try again.");
+        }
+        request.log.warn({ err: error }, "Google identity verification failed");
+        throw app.httpErrors.unauthorized("Google authentication is invalid or expired.");
       }
     });
 

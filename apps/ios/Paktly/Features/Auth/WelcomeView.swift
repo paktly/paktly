@@ -1,3 +1,5 @@
+import AuthenticationServices
+import GoogleSignInSwift
 import SwiftUI
 
 struct WelcomeView: View {
@@ -7,8 +9,7 @@ struct WelcomeView: View {
     @State private var challengeID: String?
     @State private var isRequesting = false
     @State private var localError: String?
-    @State private var unavailableProvider = ""
-    @State private var showingProviderNotice = false
+    @State private var appleNonce: String?
 
     private var normalizedEmail: String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -25,17 +26,17 @@ struct WelcomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Spacer(minLength: 48)
-                    PaktlyWordmark(markSize: 44)
+                    Spacer(minLength: 24)
+                    PaktlyWordmark(markSize: 42)
 
                     Text("SHARED PLANS · SHARED GOALS · SHARED MONEY")
                         .font(.caption2.weight(.bold))
                         .tracking(0.8)
                         .foregroundStyle(PaktlyColor.forest)
-                        .padding(.top, 22)
+                        .padding(.top, 18)
 
                     Text("Make the plan.\nMake it happen.\nTogether.")
-                        .font(.system(size: 39, weight: .bold, design: .rounded))
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
                         .tracking(-1.1)
                         .minimumScaleFactor(0.75)
                         .padding(.top, 10)
@@ -44,7 +45,7 @@ struct WelcomeView: View {
                         .font(.body)
                         .foregroundStyle(PaktlyColor.secondaryInk)
                         .lineSpacing(3)
-                        .padding(.top, 13)
+                        .padding(.top, 11)
 
                     VStack(spacing: 14) {
                         if let challengeID {
@@ -53,7 +54,7 @@ struct WelcomeView: View {
                             emailStep
                         }
                     }
-                    .padding(.top, 30)
+                    .padding(.top, 20)
 
                     Text("By continuing, you agree to Paktly’s [Terms](https://paktly.io/terms) and acknowledge the [Privacy Policy](https://paktly.io/privacy).")
                         .font(.caption)
@@ -61,29 +62,39 @@ struct WelcomeView: View {
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
-                        .padding(.top, 18)
-                        .padding(.bottom, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 20)
                 }
+                .frame(maxWidth: 520, alignment: .leading)
                 .padding(24)
+                .frame(maxWidth: .infinity)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .foregroundStyle(PaktlyColor.ink)
-        .alert("(unavailableProvider) sign-in", isPresented: $showingProviderNotice) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("This option is being connected and will be available soon. Continue with email for now.")
-        }
     }
 
     private var emailStep: some View {
         VStack(spacing: 14) {
-            SocialAuthButton(title: "Continue with Apple", systemImage: "apple.logo", style: .dark) {
-                showUnavailable("Apple")
+            SignInWithAppleButton(.continue) { request in
+                let nonce = AppleAuthNonce.make()
+                appleNonce = nonce
+                request.requestedScopes = [.fullName, .email]
+                request.nonce = AppleAuthNonce.sha256(nonce)
+            } onCompletion: { result in
+                handleAppleAuthorization(result)
             }
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .disabled(session.state == .authenticating)
 
-            SocialAuthButton(title: "Continue with Google", lettermark: "G", style: .light) {
-                showUnavailable("Google")
+            GoogleSignInButton {
+                Task { await session.signInWithGoogle() }
             }
+            .frame(height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .disabled(session.state == .authenticating)
 
             HStack(spacing: 12) {
                 Rectangle().fill(PaktlyColor.secondaryInk.opacity(0.18)).frame(height: 1)
@@ -94,26 +105,39 @@ struct WelcomeView: View {
             }
             .padding(.vertical, 2)
 
-            TextField("Email address", text: $email)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textContentType(.emailAddress)
-                .padding(16)
-                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
+            HStack(spacing: 10) {
+                Image(systemName: "envelope")
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                TextField("Email address", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textContentType(.emailAddress)
+                    .submitLabel(.continue)
+                    .onSubmit { Task { await requestCode() } }
+                Button { Task { await requestCode() } } label: {
+                    Group {
+                        if isRequesting {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "arrow.right")
+                        }
+                    }
+                    .font(.headline)
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(.white)
+                    .background(PaktlyColor.forest, in: Circle())
                 }
-
-            Button { Task { await requestCode() } } label: {
-                HStack {
-                    if isRequesting { ProgressView().tint(PaktlyColor.background) }
-                    Text(isRequesting ? "Sending code…" : "Continue with email")
-                }
+                .disabled(isRequesting || !normalizedEmail.contains("@"))
+                .accessibilityLabel(isRequesting ? "Sending code" : "Continue with email")
             }
-            .buttonStyle(PaktlyPrimaryButtonStyle())
-            .disabled(isRequesting || !normalizedEmail.contains("@"))
+            .frame(height: 54)
+            .padding(.horizontal, 14)
+            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
+            }
             errorText
         }
     }
@@ -164,7 +188,7 @@ struct WelcomeView: View {
     }
 
     private func requestCode() async {
-        guard !isRequesting else { return }
+        guard !isRequesting, normalizedEmail.contains("@") else { return }
         isRequesting = true
         localError = nil
         defer { isRequesting = false }
@@ -175,55 +199,32 @@ struct WelcomeView: View {
         }
     }
 
-    private func showUnavailable(_ provider: String) {
-        unavailableProvider = provider
-        showingProviderNotice = true
-    }
-}
-
-private struct SocialAuthButton: View {
-    enum Style { case dark, light }
-
-    let title: String
-    var systemImage: String?
-    var lettermark: String?
-    let style: Style
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Text(title).font(.headline)
-                HStack {
-                    if let systemImage {
-                        Image(systemName: systemImage).font(.system(size: 19, weight: .semibold))
-                    } else if let lettermark {
-                        Text(lettermark).font(.system(size: 19, weight: .bold, design: .rounded))
-                    }
-                    Spacer()
-                    Text("Soon")
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            (style == .dark ? Color.white.opacity(0.16) : PaktlyColor.mint.opacity(0.45)),
-                            in: Capsule()
-                        )
-                }
+    private func handleAppleAuthorization(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case let .success(authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let token = String(data: tokenData, encoding: .utf8),
+                let nonce = appleNonce
+            else {
+                localError = FederatedAuthError.missingToken.localizedDescription
+                return
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .foregroundStyle(style == .dark ? Color.white : PaktlyColor.ink)
-            .background(style == .dark ? Color.black : PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .overlay {
-                if style == .light {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
-                }
+            let name = credential.fullName.flatMap {
+                let value = PersonNameComponentsFormatter().string(from: $0).trimmingCharacters(in: .whitespacesAndNewlines)
+                return value.isEmpty ? nil : value
+            }
+            Task {
+                await session.completeAppleSignIn(identityToken: token, nonce: nonce, displayName: name)
+                appleNonce = nil
+            }
+        case let .failure(error):
+            appleNonce = nil
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                localError = "Apple sign-in couldn’t be completed. Please try again."
             }
         }
-        .buttonStyle(.plain)
     }
 }
 

@@ -70,6 +70,12 @@ private struct EmailOTPSessionResponse: Decodable {
     let isNewUser: Bool
     let user: APIUser
 }
+private struct AppleAuthenticationRequest: Encodable {
+    let identityToken: String
+    let nonce: String
+    let displayName: String?
+}
+private struct GoogleAuthenticationRequest: Encodable { let identityToken: String }
 private struct LinkSmartWalletRequest: Encodable { let accessToken: String }
 private struct LinkSmartWalletResponse: Decodable { let wallet: String?; let network: String }
 private struct UsernameAvailabilityRequest: Encodable { let username: String }
@@ -276,6 +282,30 @@ actor APIClient {
             path: "auth/email/verify",
             method: "POST",
             body: EmailOTPVerifyRequest(challengeId: challengeId, email: email, code: code),
+            authenticated: false
+        )
+        try KeychainTokenStore.save(response.accessToken)
+        return (response.user, response.isNewUser)
+    }
+
+    func authenticateWithApple(identityToken: String, nonce: String, displayName: String?) async throws -> (APIUser, Bool) {
+        let response = try await send(
+            EmailOTPSessionResponse.self,
+            path: "auth/apple",
+            method: "POST",
+            body: AppleAuthenticationRequest(identityToken: identityToken, nonce: nonce, displayName: displayName),
+            authenticated: false
+        )
+        try KeychainTokenStore.save(response.accessToken)
+        return (response.user, response.isNewUser)
+    }
+
+    func authenticateWithGoogle(identityToken: String) async throws -> (APIUser, Bool) {
+        let response = try await send(
+            EmailOTPSessionResponse.self,
+            path: "auth/google",
+            method: "POST",
+            body: GoogleAuthenticationRequest(identityToken: identityToken),
             authenticated: false
         )
         try KeychainTokenStore.save(response.accessToken)

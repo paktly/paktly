@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import type { Environment } from "../src/config/environment.js";
 import { createSocketFiSession } from "../src/modules/auth/authentication.js";
 import { requestEmailOtp, verifyEmailOtp } from "../src/modules/auth/email-otp.js";
+import { createFederatedSession } from "../src/modules/auth/federated.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -126,5 +127,33 @@ suite("SocketFi identity persistence", () => {
       email,
       code: challenge.developmentCode
     }, emailAuth)).rejects.toThrow("OTP_INVALID");
+  });
+
+  it("links verified providers by email and rejects assertion replay", async () => {
+    const email = `federated-${randomUUID()}@example.com`;
+    const expiresAt = new Date(Date.now() + 5 * 60_000);
+    const google = await createFederatedSession(app.db, {
+      provider: "GOOGLE",
+      subject: `google-${randomUUID()}`,
+      email,
+      displayName: "Alex Paktly",
+      assertionHash: randomUUID().replaceAll("-", "").padEnd(64, "0"),
+      expiresAt
+    });
+    expect(google.isNewUser).toBe(true);
+    expect(google.user).toMatchObject({ email, displayName: "Alex Paktly" });
+
+    const replayHash = randomUUID().replaceAll("-", "").padEnd(64, "0");
+    const appleIdentity = {
+      provider: "APPLE" as const,
+      subject: `apple-${randomUUID()}`,
+      email,
+      assertionHash: replayHash,
+      expiresAt
+    };
+    const apple = await createFederatedSession(app.db, appleIdentity);
+    expect(apple.isNewUser).toBe(false);
+    expect(apple.user.id).toBe(google.user.id);
+    await expect(createFederatedSession(app.db, appleIdentity)).rejects.toThrow("FEDERATED_ASSERTION_REPLAYED");
   });
 });

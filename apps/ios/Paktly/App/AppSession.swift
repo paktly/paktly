@@ -62,6 +62,39 @@ final class AppSession: ObservableObject {
         }
     }
 
+    func completeAppleSignIn(identityToken: String, nonce: String, displayName: String?) async {
+        await authenticateFederated {
+            try await apiClient.authenticateWithApple(
+                identityToken: identityToken,
+                nonce: nonce,
+                displayName: displayName
+            )
+        }
+    }
+
+    func signInWithGoogle() async {
+        await authenticateFederated {
+            let identityToken = try await GoogleAuthentication.identityToken()
+            return try await apiClient.authenticateWithGoogle(identityToken: identityToken)
+        }
+    }
+
+    private func authenticateFederated(
+        operation: () async throws -> (APIUser, Bool)
+    ) async {
+        guard state != .authenticating else { return }
+        state = .authenticating
+        errorMessage = nil
+        do {
+            let (user, isNewUser) = try await operation()
+            state = isNewUser || user.displayName == "Paktly member" ? .needsProfile : .signedIn
+        } catch {
+            errorMessage = (error as? any LocalizedError)?.errorDescription
+                ?? "We couldn’t sign you in. Please try again."
+            state = .failed
+        }
+    }
+
     func completeProfile(displayName: String, username: String?) async {
         state = .authenticating
         errorMessage = nil
@@ -95,6 +128,7 @@ final class AppSession: ObservableObject {
     }
 
     func signOut() async {
+        GoogleAuthentication.signOut()
         await smartAccountService.signOut()
         KeychainTokenStore.clear()
         errorMessage = nil

@@ -12,6 +12,14 @@ describe("loadEnvironment", () => {
         enabled: false,
         from: "Paktly <hello@paktly.io>"
       },
+      appleAuth: {
+        enabled: false,
+        clientId: "io.paktly.app"
+      },
+      googleAuth: {
+        enabled: false,
+        serverClientId: "not-configured"
+      },
       logLevel: "info",
       nodeEnvironment: "development",
       rateLimitMax: 300,
@@ -93,5 +101,10 @@ describe("loadEnvironment", () => {
         password: "app-specific-password"
       }
     });
+  });
+
+  it("requires provider client IDs when federated authentication is enabled", () => {
+    expect(() => loadEnvironment({ APPLE_AUTH_ENABLED: "true" })).toThrow("APPLE_CLIENT_ID");
+    expect(() => loadEnvironment({ GOOGLE_AUTH_ENABLED: "true" })).toThrow("GOOGLE_SERVER_CLIENT_ID");
   });
 });

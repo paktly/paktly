@@ -5,6 +5,10 @@ options:
     iOS: "17.0"
   developmentLanguage: en
   xcodeVersion: "16.0"
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 9.0.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -28,6 +32,11 @@ targets:
         SocketFiApplicationID: io.paktly.app
         SocketFiNetwork: TESTNET
         SocketFiRPID: socket.fi
+        PaktlyGoogleIOSClientID: CHANGE_ME_GOOGLE_IOS_CLIENT_ID
+        PaktlyGoogleServerClientID: CHANGE_ME_GOOGLE_WEB_CLIENT_ID
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - CHANGE_ME_GOOGLE_REVERSED_IOS_CLIENT_ID
         UIRequiresFullScreen: false
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
@@ -50,6 +59,11 @@ targets:
         DEVELOPMENT_TEAM: GC29BX444D
         CODE_SIGN_ENTITLEMENTS: Paktly/Paktly.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
     scheme:
       testTargets:
         - PaktlyTests

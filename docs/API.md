@@ -6,6 +6,8 @@ Authentication routes:
 
 - `POST /auth/email/request` sends a six-digit, ten-minute email code.
 - `POST /auth/email/verify` consumes the code and issues a Paktly session.
+- `POST /auth/apple` verifies a nonce-bound Apple identity token and issues a Paktly session.
+- `POST /auth/google` verifies a Google ID token for the configured server audience and issues a Paktly session.
 - `POST /auth/socketfi` signs in an existing SocketFi-linked user with a passkey.
 - `POST /me/smart-wallet/socketfi` links a newly activated SocketFi wallet to the authenticated Paktly account.
 
@@ -19,6 +21,8 @@ Core routes:
 - `POST /me/username-availability`
 - `POST /auth/email/request`
 - `POST /auth/email/verify`
+- `POST /auth/apple`
+- `POST /auth/google`
 - `POST /auth/socketfi`
 - `POST /me/smart-wallet/socketfi`
 - `GET/POST /groups`

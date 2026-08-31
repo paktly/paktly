@@ -1,3 +1,4 @@
+import GoogleSignIn
 import SwiftUI
 
 @main
@@ -13,6 +14,9 @@ struct PaktlyApp: App {
                 .environmentObject(session)
                 .environmentObject(model)
                 .tint(PaktlyColor.forest)
+                .onOpenURL { url in
+                    _ = GIDSignIn.sharedInstance.handle(url)
+                }
         }
     }
 }

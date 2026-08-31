@@ -31,6 +31,10 @@ const environmentSchema = z.object({
   SMTP_USERNAME: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   EMAIL_FROM: z.string().default("Paktly <hello@paktly.io>"),
+  APPLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  APPLE_CLIENT_ID: z.string().min(3).optional(),
+  GOOGLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  GOOGLE_SERVER_CLIENT_ID: z.string().min(10).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -63,6 +67,14 @@ export type Environment = {
       username: string;
       password: string;
     };
+  };
+  appleAuth?: {
+    enabled: boolean;
+    clientId: string;
+  };
+  googleAuth?: {
+    enabled: boolean;
+    serverClientId: string;
   };
 };
 
@@ -119,6 +131,12 @@ export function loadEnvironment(
       "Invalid environment configuration: EMAIL_OTP_SECRET, SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD are required when email authentication is enabled"
     );
   }
+  if (parsed.data.APPLE_AUTH_ENABLED && !source.APPLE_CLIENT_ID) {
+    throw new Error("Invalid environment configuration: APPLE_CLIENT_ID is required when Apple authentication is enabled");
+  }
+  if (parsed.data.GOOGLE_AUTH_ENABLED && !source.GOOGLE_SERVER_CLIENT_ID) {
+    throw new Error("Invalid environment configuration: GOOGLE_SERVER_CLIENT_ID is required when Google authentication is enabled");
+  }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
     .map((value) => value.trim())
@@ -160,6 +178,14 @@ export function loadEnvironment(
             }
           }
         : {})
+    },
+    appleAuth: {
+      enabled: parsed.data.APPLE_AUTH_ENABLED,
+      clientId: parsed.data.APPLE_CLIENT_ID ?? "io.paktly.app"
+    },
+    googleAuth: {
+      enabled: parsed.data.GOOGLE_AUTH_ENABLED,
+      serverClientId: parsed.data.GOOGLE_SERVER_CLIENT_ID ?? "not-configured"
     }
   };
 }

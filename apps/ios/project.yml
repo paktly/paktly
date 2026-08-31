@@ -32,11 +32,11 @@ targets:
         SocketFiApplicationID: io.paktly.app
         SocketFiNetwork: TESTNET
         SocketFiRPID: socket.fi
-        PaktlyGoogleIOSClientID: CHANGE_ME_GOOGLE_IOS_CLIENT_ID
-        PaktlyGoogleServerClientID: CHANGE_ME_GOOGLE_WEB_CLIENT_ID
+        PaktlyGoogleIOSClientID: 41146548867-btsmojjnpkc7nbmup1sdp4rnr8f1ula1.apps.googleusercontent.com
+        PaktlyGoogleServerClientID: 41146548867-jof7pg8sm1gjddi8fq657s9esft7qi34.apps.googleusercontent.com
         CFBundleURLTypes:
           - CFBundleURLSchemes:
-              - CHANGE_ME_GOOGLE_REVERSED_IOS_CLIENT_ID
+              - com.googleusercontent.apps.41146548867-btsmojjnpkc7nbmup1sdp4rnr8f1ula1
         UIRequiresFullScreen: false
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait

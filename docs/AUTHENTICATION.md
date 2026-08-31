@@ -14,8 +14,8 @@ Paktly identity is separate from the optional SocketFi Smart Wallet. Creating an
 
 1. Create an OAuth iOS client for bundle ID `io.paktly.app` in Google Cloud.
 2. Create a separate OAuth web client used as the backend/server audience.
-3. Replace `CHANGE_ME_GOOGLE_IOS_CLIENT_ID`, `CHANGE_ME_GOOGLE_WEB_CLIENT_ID`, and `CHANGE_ME_GOOGLE_REVERSED_IOS_CLIENT_ID` in `apps/ios/project.yml`.
-4. Set `GOOGLE_AUTH_ENABLED=true` and set `GOOGLE_SERVER_CLIENT_ID` to the exact web client ID on the API.
+3. The registered Paktly iOS client ID, backend client ID, and reversed URL scheme are configured in `apps/ios/project.yml`.
+4. Set `GOOGLE_AUTH_ENABLED=true` and set `GOOGLE_SERVER_CLIENT_ID=41146548867-jof7pg8sm1gjddi8fq657s9esft7qi34.apps.googleusercontent.com` on the API.
 5. Regenerate the Xcode project. The app uses Google's official SDK and sends only the ID token to Paktly; the API verifies signature, issuer, audience, expiration, and verified email before consuming the assertion once.
 
 ## Account matching

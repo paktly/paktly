@@ -18,6 +18,16 @@ struct ActivityView: View {
                                 .foregroundStyle(PaktlyColor.secondaryInk)
                         }
                         Spacer()
+                        if model.unreadNotificationCount > 0 {
+                            Button("Read all") {
+                                Task {
+                                    try? await model.client.markAllNotificationsRead()
+                                    await model.refresh()
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(PaktlyColor.forest)
+                        }
                         Button { Task { await load() } } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.headline.weight(.semibold))

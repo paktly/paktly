@@ -15,6 +15,7 @@ struct HomeView: View {
                 LazyVStack(spacing: 22) {
                     header
                     moneyOverview
+                    if !model.invitations.isEmpty { invitationsSection }
                     plansSection
                     statusSection
                 }
@@ -26,6 +27,15 @@ struct HomeView: View {
             .refreshable { await model.refresh() }
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { id in GroupDetailView(groupID: id) }
+        }
+    }
+
+    private var invitationsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PaktlySectionHeader(title: model.invitations.count == 1 ? "Plan invitation" : "Plan invitations")
+            ForEach(model.invitations.prefix(2)) { invitation in
+                PaktlyInvitationCard(invitation: invitation) { model.presentInvitation(invitation) }
+            }
         }
     }
 

@@ -8,6 +8,9 @@ export default defineConfig({
         "src/modules/auth/authentication.ts",
         "src/modules/auth/email-otp.ts",
         "src/modules/auth/federated.ts",
+        "src/modules/notifications/apns-provider.ts",
+        "src/modules/notifications/service.ts",
+        "src/modules/notifications/worker.ts",
         "src/platform/database.ts"
       ],
       provider: "v8",

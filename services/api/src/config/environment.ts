@@ -36,6 +36,11 @@ const environmentSchema = z.object({
   APPLE_CLIENT_ID: z.string().min(3).optional(),
   GOOGLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   GOOGLE_SERVER_CLIENT_ID: z.string().min(10).optional(),
+  APNS_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  APNS_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/).optional(),
+  APNS_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/).optional(),
+  APNS_PRIVATE_KEY: z.string().min(100).optional(),
+  APNS_BUNDLE_ID: z.string().min(3).default("io.paktly.app"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -77,6 +82,13 @@ export type Environment = {
   googleAuth?: {
     enabled: boolean;
     serverClientId: string;
+  };
+  apns?: {
+    enabled: boolean;
+    teamId: string;
+    keyId: string;
+    privateKey: string;
+    bundleId: string;
   };
 };
 
@@ -139,6 +151,9 @@ export function loadEnvironment(
   if (parsed.data.GOOGLE_AUTH_ENABLED && !source.GOOGLE_SERVER_CLIENT_ID) {
     throw new Error("Invalid environment configuration: GOOGLE_SERVER_CLIENT_ID is required when Google authentication is enabled");
   }
+  if (parsed.data.APNS_ENABLED && (!source.APNS_TEAM_ID || !source.APNS_KEY_ID || !source.APNS_PRIVATE_KEY)) {
+    throw new Error("Invalid environment configuration: APNS_TEAM_ID, APNS_KEY_ID, and APNS_PRIVATE_KEY are required when APNs is enabled");
+  }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
     .map((value) => value.trim())
@@ -189,6 +204,13 @@ export function loadEnvironment(
     googleAuth: {
       enabled: parsed.data.GOOGLE_AUTH_ENABLED,
       serverClientId: parsed.data.GOOGLE_SERVER_CLIENT_ID ?? "not-configured"
+    },
+    apns: {
+      enabled: parsed.data.APNS_ENABLED,
+      teamId: parsed.data.APNS_TEAM_ID ?? "0000000000",
+      keyId: parsed.data.APNS_KEY_ID ?? "0000000000",
+      privateKey: parsed.data.APNS_PRIVATE_KEY ?? "disabled",
+      bundleId: parsed.data.APNS_BUNDLE_ID
     }
   };
 }

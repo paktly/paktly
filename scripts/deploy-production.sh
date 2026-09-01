@@ -33,7 +33,7 @@ done
 
 echo "Applying database migrations"
 "${compose[@]}" run --rm --no-deps api node scripts/migrate.mjs
-"${compose[@]}" up -d --no-deps api
+"${compose[@]}" up -d --no-deps api notification-worker
 published_endpoint="$("${compose[@]}" port api 4000)"
 [[ -n "$published_endpoint" ]] || { echo "Could not determine the published API port" >&2; exit 1; }
 
@@ -42,7 +42,7 @@ if ! PAKTLY_VERIFY_URL="http://$published_endpoint" "$repo_root/scripts/verify-p
   if [[ -n "$previous_release" ]] && docker image inspect "$image_name:$previous_release" >/dev/null 2>&1; then
     echo "Rolling back application container to $previous_release"
     export PAKTLY_RELEASE="$previous_release"
-    "${compose[@]}" up -d --no-deps api
+    "${compose[@]}" up -d --no-deps api notification-worker
   fi
   exit 1
 fi

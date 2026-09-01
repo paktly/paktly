@@ -3,6 +3,7 @@ import type { Sql } from "postgres";
 import type { Environment } from "../../config/environment.js";
 import { hashToken } from "./authentication.js";
 import type { EmailProvider } from "./email-provider.js";
+import { reconcileInvitationNotifications } from "../notifications/service.js";
 
 const OTP_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -113,6 +114,7 @@ export async function verifyEmailOtp(
       user = { ...user, display_name: "Paktly member", username: null };
     }
     if (!user) throw new Error("USER_SESSION_FAILED");
+    await reconcileInvitationNotifications(tx, String(user.id), email);
     const accessToken = randomUUID() + randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await tx`

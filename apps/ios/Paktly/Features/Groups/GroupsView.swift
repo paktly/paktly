@@ -36,6 +36,15 @@ struct GroupsView: View {
                         .accessibilityLabel("New plan")
                     }
 
+                    if !model.invitations.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            PaktlySectionHeader(title: "Invitations")
+                            ForEach(model.invitations) { invitation in
+                                PaktlyInvitationCard(invitation: invitation) { model.presentInvitation(invitation) }
+                            }
+                        }
+                    }
+
                     if model.groups.isEmpty {
                         PaktlyEmptyState(
                             title: "Start a shared plan",

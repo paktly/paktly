@@ -25,6 +25,8 @@ configuration as email OTP and production fails closed when email is unavailable
 
 Apple authentication requires the Sign in with Apple capability on App ID `io.paktly.app`, `APPLE_AUTH_ENABLED=true`, and `APPLE_CLIENT_ID=io.paktly.app`. Google authentication requires an iOS OAuth client for the bundle ID, a separate web OAuth client for backend token audience verification, their values in `apps/ios/project.yml`, and the same web client ID in `GOOGLE_SERVER_CLIENT_ID`. The reversed iOS client ID must be registered as the app URL scheme. Provider options must not be enabled in production until these identifiers are real and matching.
 
+Remote notifications use an APNs token-signing key. Enable the Push Notifications capability for `io.paktly.app`, create an Apple `.p8` key with APNs access, then configure `APNS_ENABLED`, `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, and `APNS_BUNDLE_ID`. Store the PEM value with literal `\n` separators in `/opt/paktly/.env`; never commit the key. The production Compose deployment starts a separate `notification-worker` from the same immutable image. Keep APNs disabled until the capability, provisioning profiles, and both sandbox and TestFlight delivery have been verified. See [NOTIFICATIONS.md](NOTIFICATIONS.md).
+
 ## Web
 
 The public content is statically rendered, while `/api/waitlist` is a server route backed by PostgreSQL. Apply the consent-table migration before serving traffic:

@@ -320,7 +320,7 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
             await tx`INSERT INTO invitations(id,group_id,email,invited_by,token_hash,expires_at) VALUES(${invitationId},${groupId},${invitationEmail},${userId},${hashToken(rawToken)},now()+interval '7 days')`;
             await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary,metadata) VALUES(${randomUUID()},${groupId},${userId},'INVITATION_SENT','INVITATION',${invitationId},${`${request.authenticatedUser!.displayName} invited ${invitationEmail}`},${app.db.json({ email: invitationEmail })})`;
             if (invitedUserId) {
-              await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) VALUES(${randomUUID()},${invitedUserId},${groupId},'INVITATION_RECEIVED','You were invited',${`${request.authenticatedUser!.displayName} invited you to ${String(group.name)}`},'INVITATION',${invitationId})`;
+              await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id,category,data,deep_link,deduplication_key,priority,expires_at) VALUES(${randomUUID()},${invitedUserId},${groupId},'INVITATION_RECEIVED','You were invited',${`${request.authenticatedUser!.displayName} invited you to ${String(group.name)}`},'INVITATION',${invitationId},'INVITATION',${app.db.json({ invitationId, groupId })},${`paktly://invitation/${invitationId}`},${`invitation:${invitationId}`},'HIGH',now()+interval '7 days')`;
             }
           });
         } catch { throw app.httpErrors.conflict("A pending invitation already exists for this email."); }
@@ -406,12 +406,19 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         return { events };
       });
 
-      authenticated.get("/notifications", async (request) => ({ notifications: await app.db`SELECT * FROM notifications WHERE user_id=${request.authenticatedUser!.id} ORDER BY created_at DESC LIMIT 100` }));
+      authenticated.get("/notifications", async (request) => ({
+        notifications: await app.db`SELECT * FROM notifications WHERE user_id=${request.authenticatedUser!.id} ORDER BY created_at DESC LIMIT 100`,
+        unreadCount: Number((await app.db`SELECT count(*)::int count FROM notifications WHERE user_id=${request.authenticatedUser!.id} AND read_at IS NULL`)[0]?.count ?? 0)
+      }));
       authenticated.post("/notifications/:notificationId/read", async (request) => {
         const { notificationId } = parse(z.object({ notificationId: uuid }), request.params, app.httpErrors.badRequest);
         const [notification] = await app.db`UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE id=${notificationId} AND user_id=${request.authenticatedUser!.id} RETURNING *`;
         if (!notification) throw app.httpErrors.notFound("Notification not found.");
         return { notification };
+      });
+      authenticated.post("/notifications/read-all", async (request) => {
+        const result = await app.db`UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE user_id=${request.authenticatedUser!.id} AND read_at IS NULL RETURNING id`;
+        return { updated: result.length };
       });
       await Promise.resolve();
     });

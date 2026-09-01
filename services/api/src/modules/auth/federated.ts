@@ -3,6 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Sql } from "postgres";
 import type { Environment } from "../../config/environment.js";
 import { hashToken } from "./authentication.js";
+import { reconcileInvitationNotifications } from "../notifications/service.js";
 
 const appleKeys = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
 const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
@@ -118,6 +119,7 @@ export async function createFederatedSession(database: Sql, identity: FederatedI
       WHERE u.id=${userId} AND u.status='ACTIVE'
     `;
     if (!profile) throw new Error("FEDERATED_PROFILE_MISSING");
+    await reconcileInvitationNotifications(tx, String(profile.id), String(profile.email));
     const accessToken = randomUUID() + randomUUID();
     const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await tx`

@@ -38,7 +38,10 @@ struct MainTabView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
-        .task { await model.refresh() }
+        .task {
+            await model.refresh()
+            await PushNotificationService.shared.activateIfAuthorized()
+        }
         .sheet(
             item: Binding(
                 get: { model.presentedInvitation },
@@ -50,6 +53,14 @@ struct MainTabView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(
+            item: Binding(
+                get: { model.presentedPlan },
+                set: { value in if value == nil { model.dismissPresentedPlan() } }
+            )
+        ) { plan in
+            NavigationStack { GroupDetailView(groupID: plan.id) }
+        }
     }
 
     private var tabBar: some View {
@@ -59,9 +70,20 @@ struct MainTabView: View {
                     withAnimation(.easeOut(duration: 0.2)) { selection = tab }
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: selection == tab ? "\(tab.icon).fill" : tab.icon)
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(height: 20)
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: selection == tab ? "\(tab.icon).fill" : tab.icon)
+                                .font(.system(size: 17, weight: .semibold))
+                                .frame(height: 20)
+                            if tab == .activity && model.unreadNotificationCount > 0 {
+                                Text(model.unreadNotificationCount > 99 ? "99+" : "\(model.unreadNotificationCount)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(PaktlyColor.coral, in: Capsule())
+                                    .offset(x: 12, y: -7)
+                            }
+                        }
                         Text(tab.title)
                             .font(.system(size: 10, weight: selection == tab ? .bold : .medium))
                     }

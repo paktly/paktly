@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UserNotifications
 
 struct PlanInvitationFailure: Error {
     let failedIdentifiers: [String]
@@ -9,15 +10,18 @@ struct PresentedInvitation: Identifiable, Equatable {
     let invitation: APIInvitation
     var id: String { invitation.id }
 }
+struct PresentedPlan: Identifiable, Equatable { let id: String }
 
 @MainActor
 final class AppModel: ObservableObject {
     enum LoadState: Equatable { case idle, loading, loaded, failed(String) }
     @Published private(set) var groups: [APIGroup] = []
     @Published private(set) var notifications: [APINotification] = []
+    @Published private(set) var unreadNotificationCount = 0
     @Published private(set) var invitations: [APIInvitation] = []
     @Published private(set) var presentedInvitation: PresentedInvitation?
     @Published private(set) var invitationError: String?
+    @Published private(set) var presentedPlan: PresentedPlan?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -43,10 +47,16 @@ final class AppModel: ObservableObject {
             // Notifications and invitations enhance the dashboard, but neither
             // should prevent owned or joined plans from loading.
             if let loadedNotifications = try? await client.notifications() {
-                notifications = loadedNotifications
+                notifications = loadedNotifications.0
+                unreadNotificationCount = loadedNotifications.1
+                try? await UNUserNotificationCenter.current().setBadgeCount(loadedNotifications.1)
             }
             if let loadedInvitations = try? await client.pendingInvitations() {
                 invitations = loadedInvitations
+            }
+            if let pendingPush = PendingPushStore.load() {
+                await routeRemoteNotification(pendingPush)
+                PendingPushStore.clear()
             }
             if let invitationToken = PendingInvitationStore.load() {
                 do {
@@ -77,6 +87,37 @@ final class AppModel: ObservableObject {
         PendingInvitationStore.save(token)
         if KeychainTokenStore.load() != nil {
             Task { await refresh() }
+        }
+    }
+
+    func handleRemoteNotification(_ payload: [AnyHashable: Any]) {
+        let normalized = payload.reduce(into: [String: String]()) { result, item in
+            if let key = item.key as? String, let value = item.value as? String { result[key] = value }
+        }
+        guard KeychainTokenStore.load() != nil else {
+            PendingPushStore.save(normalized)
+            return
+        }
+        Task {
+            await routeRemoteNotification(normalized)
+        }
+    }
+
+    func dismissPresentedPlan() { presentedPlan = nil }
+
+    private func routeRemoteNotification(_ payload: [String: String]) async {
+        if let notificationId = payload["notificationId"] { try? await client.markNotificationRead(id: notificationId) }
+        if let loadedInvitations = try? await client.pendingInvitations() { invitations = loadedInvitations }
+        if let invitationId = payload["entityId"], payload["entityType"] == "INVITATION",
+           let invitation = invitations.first(where: { $0.id == invitationId }) {
+            presentInvitation(invitation)
+        } else if let groupId = payload["groupId"] {
+            presentedPlan = PresentedPlan(id: groupId)
+        }
+        if let loadedNotifications = try? await client.notifications() {
+            notifications = loadedNotifications.0
+            unreadNotificationCount = loadedNotifications.1
+            try? await UNUserNotificationCenter.current().setBadgeCount(loadedNotifications.1)
         }
     }
 
@@ -166,4 +207,11 @@ private enum PendingInvitationStore {
     static func clear() {
         UserDefaults.standard.removeObject(forKey: key)
     }
+}
+
+private enum PendingPushStore {
+    private static let key = "io.paktly.pending-push"
+    static func save(_ payload: [String: String]) { UserDefaults.standard.set(payload, forKey: key) }
+    static func load() -> [String: String]? { UserDefaults.standard.dictionary(forKey: key) as? [String: String] }
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
 }

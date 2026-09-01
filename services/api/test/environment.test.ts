@@ -21,6 +21,13 @@ describe("loadEnvironment", () => {
         enabled: false,
         serverClientId: "not-configured"
       },
+      apns: {
+        enabled: false,
+        teamId: "0000000000",
+        keyId: "0000000000",
+        privateKey: "disabled",
+        bundleId: "io.paktly.app"
+      },
       logLevel: "info",
       nodeEnvironment: "development",
       rateLimitMax: 300,
@@ -108,5 +115,9 @@ describe("loadEnvironment", () => {
   it("requires provider client IDs when federated authentication is enabled", () => {
     expect(() => loadEnvironment({ APPLE_AUTH_ENABLED: "true" })).toThrow("APPLE_CLIENT_ID");
     expect(() => loadEnvironment({ GOOGLE_AUTH_ENABLED: "true" })).toThrow("GOOGLE_SERVER_CLIENT_ID");
+  });
+
+  it("requires APNs signing credentials when push delivery is enabled", () => {
+    expect(() => loadEnvironment({ APNS_ENABLED: "true" })).toThrow("APNS_TEAM_ID");
   });
 });

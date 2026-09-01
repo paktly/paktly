@@ -40,6 +40,10 @@ Core routes:
 - `GET /groups/:groupId/activity`
 - `GET /notifications`
 - `POST /notifications/:notificationId/read`
+- `POST /notifications/read-all`
+- `POST /devices/push`
+- `DELETE /devices/push/:installationId`
+- `GET/PATCH /notification-preferences`
 
 Expense mutations accept UUID `clientOperationId` values. Retrying a create with the same ID returns the original expense. Updates require `expectedVersion` and fail with `409` after a concurrent edit. Amounts are integer minor units. Percentage weights are integer basis points totaling `10000`.
 

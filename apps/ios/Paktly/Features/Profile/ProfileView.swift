@@ -1,14 +1,17 @@
 import SwiftUI
+import UIKit
 
 struct ProfileView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var pushNotifications: PushNotificationService
     @State private var displayName = ""
     @State private var username = ""
     @State private var isSaving = false
     @State private var saveError: String?
     @State private var showingWalletActivation = false
     @State private var usernameStatus: UsernameAvailabilityField.Status = .optional
+    @State private var showingNotificationSettings = false
 
     private var normalizedUsername: String? {
         let value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -133,8 +136,32 @@ struct ProfileView: View {
                     }
 
                     PaktlyPanel {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Label("Notifications", systemImage: "bell.badge.fill")
+                                    .font(.headline).foregroundStyle(PaktlyColor.ink)
+                                Spacer()
+                                PaktlyRowPill(text: notificationStatusLabel)
+                            }
+                            Text("Get invitations, expense updates, settlements, and important plan changes when Paktly isn’t open.")
+                                .font(.subheadline)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            Button(notificationButtonTitle) {
+                                Task { await handleNotificationsButton() }
+                            }
+                            .buttonStyle(PaktlyPrimaryButtonStyle())
+                            if let error = pushNotifications.registrationError {
+                                Text(error).font(.footnote).foregroundStyle(PaktlyColor.coral)
+                            }
+                        }
+                    }
+
+                    PaktlyPanel {
                         Button("Sign out", role: .destructive) {
-                            Task { await session.signOut() }
+                            Task {
+                                await pushNotifications.unregister()
+                                await session.signOut()
+                            }
                         }
                         .font(.subheadline.weight(.semibold))
                     }
@@ -156,6 +183,39 @@ struct ProfileView: View {
                 .environmentObject(session)
                 .presentationDetents([.large])
             }
+            .sheet(isPresented: $showingNotificationSettings) {
+                NotificationPreferencesView()
+                    .environmentObject(pushNotifications)
+            }
+            .task { await pushNotifications.refreshAuthorizationState() }
+        }
+    }
+
+    private var notificationStatusLabel: String {
+        switch pushNotifications.authorizationState {
+        case .authorized, .provisional: "On"
+        case .denied: "Off"
+        case .unknown: "Not set"
+        }
+    }
+
+    private var notificationButtonTitle: String {
+        switch pushNotifications.authorizationState {
+        case .authorized, .provisional: "Manage notifications"
+        case .denied: "Open iPhone Settings"
+        case .unknown: "Turn on notifications"
+        }
+    }
+
+    private func handleNotificationsButton() async {
+        switch pushNotifications.authorizationState {
+        case .authorized, .provisional:
+            showingNotificationSettings = true
+        case .denied:
+            if let url = URL(string: UIApplication.openSettingsURLString) { await UIApplication.shared.open(url) }
+        case .unknown:
+            await pushNotifications.requestAuthorization()
+            if pushNotifications.authorizationState == .authorized { showingNotificationSettings = true }
         }
     }
 
@@ -197,6 +257,66 @@ struct ProfileView: View {
         } catch {
             saveError = "We couldn’t save your Paktly profile. Check that the username is available."
         }
+    }
+}
+
+private struct NotificationPreferencesView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var preferences = APINotificationPreferences(
+        invitations: true, expenses: true, settlements: true, contributions: true,
+        planReminders: true, marketing: false, soundEnabled: true, badgesEnabled: true,
+        lockScreenDetail: "STANDARD"
+    )
+    @State private var loading = true
+    @State private var saving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Plan activity") {
+                    Toggle("Invitations and members", isOn: $preferences.invitations)
+                    Toggle("Expenses", isOn: $preferences.expenses)
+                    Toggle("Settlements", isOn: $preferences.settlements)
+                    Toggle("Contributions", isOn: $preferences.contributions)
+                    Toggle("Plan reminders", isOn: $preferences.planReminders)
+                }
+                Section("Delivery") {
+                    Toggle("Sounds", isOn: $preferences.soundEnabled)
+                    Toggle("App icon badges", isOn: $preferences.badgesEnabled)
+                    Picker("Lock screen previews", selection: $preferences.lockScreenDetail) {
+                        Text("Show details").tag("STANDARD")
+                        Text("Keep private").tag("PRIVATE")
+                    }
+                }
+                Section("Updates") { Toggle("Product news", isOn: $preferences.marketing) }
+                if let errorMessage { Section { Text(errorMessage).foregroundStyle(PaktlyColor.coral) } }
+            }
+            .disabled(loading || saving)
+            .overlay { if loading { ProgressView("Loading preferences…") } }
+            .navigationTitle("Notifications")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Saving…" : "Save") { Task { await save() } }.disabled(loading || saving)
+                }
+            }
+            .task { await load() }
+        }
+    }
+
+    private func load() async {
+        do { preferences = try await APIClient.shared.notificationPreferences() }
+        catch { errorMessage = "We couldn’t load your notification preferences." }
+        loading = false
+    }
+
+    private func save() async {
+        saving = true
+        errorMessage = nil
+        do { preferences = try await APIClient.shared.updateNotificationPreferences(preferences); dismiss() }
+        catch { errorMessage = "We couldn’t save your notification preferences."; saving = false }
     }
 }
 

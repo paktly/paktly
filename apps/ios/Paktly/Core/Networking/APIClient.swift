@@ -175,6 +175,7 @@ private struct ActivityResponse: Decodable {
 
 private struct NotificationsResponse: Decodable {
     let notifications: [APINotification]
+    let unreadCount: Int
 }
 
 private struct NotificationResponse: Decodable {
@@ -182,6 +183,32 @@ private struct NotificationResponse: Decodable {
 }
 
 private struct EmptyRequest: Encodable {}
+private struct EmptyResponse: Decodable {}
+private struct UpdatedCountResponse: Decodable { let updated: Int }
+
+private struct PushDeviceRegistrationRequest: Encodable {
+    let installationId: String
+    let token: String
+    let environment: String
+    let locale: String
+    let timezone: String
+    let appVersion: String?
+    let deviceModel: String?
+}
+
+struct APINotificationPreferences: Codable, Sendable {
+    var invitations: Bool
+    var expenses: Bool
+    var settlements: Bool
+    var contributions: Bool
+    var planReminders: Bool
+    var marketing: Bool
+    var soundEnabled: Bool
+    var badgesEnabled: Bool
+    var lockScreenDetail: String
+}
+
+private struct NotificationPreferencesResponse: Decodable { let preferences: APINotificationPreferences }
 
 private struct InvitationRequest: Encodable { let identifier: String }
 
@@ -477,9 +504,49 @@ actor APIClient {
         return response.events
     }
 
-    func notifications() async throws -> [APINotification] {
+    func notifications() async throws -> ([APINotification], Int) {
         let response = try await send(NotificationsResponse.self, path: "notifications")
-        return response.notifications
+        return (response.notifications, response.unreadCount)
+    }
+
+    func registerPushDevice(installationId: String, token: String, environment: String) async throws {
+        _ = try await send(
+            EmptyResponse.self,
+            path: "devices/push",
+            method: "POST",
+            body: PushDeviceRegistrationRequest(
+                installationId: installationId,
+                token: token,
+                environment: environment,
+                locale: Locale.current.identifier,
+                timezone: TimeZone.current.identifier,
+                appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                deviceModel: nil
+            )
+        )
+    }
+
+    func unregisterPushDevice(installationId: String) async throws {
+        try await sendWithoutResponse(path: "devices/push/\(installationId)", method: "DELETE")
+    }
+
+    func notificationPreferences() async throws -> APINotificationPreferences {
+        let response = try await send(NotificationPreferencesResponse.self, path: "notification-preferences")
+        return response.preferences
+    }
+
+    func updateNotificationPreferences(_ preferences: APINotificationPreferences) async throws -> APINotificationPreferences {
+        let response = try await send(
+            NotificationPreferencesResponse.self,
+            path: "notification-preferences",
+            method: "PATCH",
+            body: preferences
+        )
+        return response.preferences
+    }
+
+    func markAllNotificationsRead() async throws {
+        _ = try await send(UpdatedCountResponse.self, path: "notifications/read-all", method: "POST", body: EmptyRequest())
     }
 
     func markNotificationRead(id: String) async throws {

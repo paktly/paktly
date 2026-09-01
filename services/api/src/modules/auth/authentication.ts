@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Sql } from "postgres";
 import type { VerifiedSocketFiIdentity } from "./socketfi.js";
+import { reconcileInvitationNotifications } from "../notifications/service.js";
 
 export function hashToken(token: string): string { return createHash("sha256").update(token).digest("hex"); }
 
@@ -31,6 +32,7 @@ export async function createDevelopmentSession(database: Sql, input: { email: st
       INSERT INTO user_profiles(user_id,display_name) VALUES(${String(user.id)},${input.displayName.trim()})
       ON CONFLICT(user_id) DO UPDATE SET display_name=excluded.display_name,updated_at=now()
     `;
+    await reconcileInvitationNotifications(tx, String(user.id), email);
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await tx`INSERT INTO auth_sessions(id,user_id,token_hash,expires_at) VALUES(${randomUUID()},${String(user.id)},${hashToken(token)},${expiresAt})`;
     return { accessToken: token, expiresAt: expiresAt.toISOString(), user: { id: String(user.id), email, displayName: input.displayName.trim() } };
@@ -98,6 +100,7 @@ export async function createSocketFiSession(
         DO UPDATE SET address=excluded.address,updated_at=now()
       `;
     }
+    await reconcileInvitationNotifications(tx, String(user.id), String(user.email));
 
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await tx`

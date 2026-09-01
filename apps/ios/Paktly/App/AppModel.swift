@@ -33,10 +33,21 @@ final class AppModel: ObservableObject {
         state = .loading
         _ = await offlineQueue.synchronize(using: client)
         do {
-            async let groups = client.groups(); async let notifications = client.notifications(); async let user = client.me()
-            async let invitations = client.pendingInvitations()
-            self.groups = try await groups; self.notifications = try await notifications; currentUser = try await user
-            self.invitations = try await invitations
+            async let groupsRequest = client.groups()
+            async let userRequest = client.me()
+            let loadedGroups = try await groupsRequest
+            let loadedUser = try await userRequest
+            self.groups = loadedGroups
+            currentUser = loadedUser
+
+            // Notifications and invitations enhance the dashboard, but neither
+            // should prevent owned or joined plans from loading.
+            if let loadedNotifications = try? await client.notifications() {
+                notifications = loadedNotifications
+            }
+            if let loadedInvitations = try? await client.pendingInvitations() {
+                invitations = loadedInvitations
+            }
             if let invitationToken = PendingInvitationStore.load() {
                 do {
                     let invitation = try await client.resolveInvitation(token: invitationToken)

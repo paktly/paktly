@@ -32,7 +32,9 @@ describe("loadEnvironment", () => {
         enabled: false,
         apiKey: "disabled",
         model: "gpt-5.4-mini",
-        transcriptionModel: "gpt-4o-transcribe"
+        transcriptionModel: "gpt-4o-transcribe",
+        realtimeTranscriptionModel: "gpt-live-transcribe",
+        draftSecret: "development-only-assistant-draft-secret"
       },
       logLevel: "info",
       nodeEnvironment: "development",
@@ -96,11 +98,12 @@ describe("loadEnvironment", () => {
 
   it("requires an OpenAI key whenever Ask Paktly is enabled", () => {
     expect(() => loadEnvironment({ AI_ASSISTANT_ENABLED: "true" })).toThrow(
-      "OPENAI_API_KEY is required"
+      "OPENAI_API_KEY and ASSISTANT_DRAFT_SECRET are required"
     );
     expect(loadEnvironment({
       AI_ASSISTANT_ENABLED: "true",
-      OPENAI_API_KEY: "sk-test-key-that-is-long-enough"
+      OPENAI_API_KEY: "sk-test-key-that-is-long-enough",
+      ASSISTANT_DRAFT_SECRET: "a-secure-test-secret-that-is-long-enough"
     }).assistant).toMatchObject({ enabled: true, model: "gpt-5.4-mini" });
   });
 

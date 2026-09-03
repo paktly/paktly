@@ -55,6 +55,7 @@ struct APIInvitation: Codable, Identifiable, Sendable, Equatable {
 }
 
 struct APIAssistantDraft: Codable, Sendable {
+    struct SplitValue: Codable, Sendable { let participantQuery: String; let participantId: String?; let value: Int }
     let intent: String
     let summary: String
     let needsClarification: Bool
@@ -68,6 +69,23 @@ struct APIAssistantDraft: Codable, Sendable {
     let planName: String?
     let planDescription: String?
     let inviteIdentifier: String?
+    let inviteIdentifiers: [String]?
+    let splitMethod: String?
+    let splitValues: [SplitValue]?
+    let category: String?
+    let expenseDate: String?
+    let planStartDate: String?
+    let planEndDate: String?
+}
+struct APIAssistantInterpretation: Sendable {
+    let draft: APIAssistantDraft
+    let confirmationToken: String
+    let expiresAt: Date
+}
+struct APIRealtimeTranscriptionSession: Decodable, Sendable {
+    let clientSecret: String
+    let expiresAt: Int?
+    let model: String
 }
 struct APIJoinLinkPreview: Codable, Identifiable, Sendable, Equatable {
     let id: String
@@ -190,6 +208,7 @@ private struct CreateGroupRequest: Encodable {
     let name: String
     let description: String?
     let defaultCurrency: String
+    let clientOperationId: String?
 }
 
 private struct ExpensesResponse: Decodable {
@@ -277,7 +296,13 @@ private struct AssistantInterpretRequest: Encodable {
     let prompt: String
     let contextPlanId: String?
 }
-private struct AssistantInterpretResponse: Decodable { let draft: APIAssistantDraft }
+private struct AssistantInterpretResponse: Decodable {
+    let draft: APIAssistantDraft
+    let confirmationToken: String
+    let expiresAt: Date
+}
+private struct AssistantConfirmRequest: Encodable { let token: String; let idempotencyKey: String }
+private struct AssistantConfirmResponse: Decodable { let draft: APIAssistantDraft }
 private struct AssistantTranscriptionResponse: Decodable { let transcript: String }
 
 private struct PendingInvitationsResponse: Decodable {
@@ -489,12 +514,14 @@ actor APIClient {
     func createGroup(
         name: String,
         description: String?,
-        currency: String
+        currency: String,
+        clientOperationId: String? = nil
     ) async throws -> APIGroup {
         let body = CreateGroupRequest(
             name: name,
             description: description,
-            defaultCurrency: currency
+            defaultCurrency: currency,
+            clientOperationId: clientOperationId
         )
         let response = try await send(
             GroupResponse.self,
@@ -505,12 +532,22 @@ actor APIClient {
         return response.group
     }
 
-    func interpretAssistant(prompt: String, contextPlanId: String?) async throws -> APIAssistantDraft {
+    func interpretAssistant(prompt: String, contextPlanId: String?) async throws -> APIAssistantInterpretation {
         let response = try await send(
             AssistantInterpretResponse.self,
             path: "assistant/interpret",
             method: "POST",
             body: AssistantInterpretRequest(prompt: prompt, contextPlanId: contextPlanId)
+        )
+        return .init(draft: response.draft, confirmationToken: response.confirmationToken, expiresAt: response.expiresAt)
+    }
+
+    func confirmAssistant(token: String, idempotencyKey: String) async throws -> APIAssistantDraft {
+        let response = try await send(
+            AssistantConfirmResponse.self,
+            path: "assistant/confirm",
+            method: "POST",
+            body: AssistantConfirmRequest(token: token, idempotencyKey: idempotencyKey)
         )
         return response.draft
     }
@@ -529,6 +566,15 @@ actor APIClient {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         let data = try await perform(request)
         return try decoder.decode(AssistantTranscriptionResponse.self, from: data).transcript
+    }
+
+    func realtimeTranscriptionSession() async throws -> APIRealtimeTranscriptionSession {
+        try await send(
+            APIRealtimeTranscriptionSession.self,
+            path: "assistant/realtime-session",
+            method: "POST",
+            body: EmptyRequest()
+        )
     }
 
     func group(_ id: String) async throws -> (APIGroup, [APIGroupMember]) {

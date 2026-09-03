@@ -8,7 +8,9 @@ describe("deterministic assistant resolution", () => {
     ["Add the $48 dinner I paid for everyone in Lisbon", "CREATE_EXPENSE"],
     ["I spent 35 USD on a taxi", "CREATE_EXPENSE"],
     ["Invite alex@example.com to Bali", "INVITE_PERSON"],
-    ["Bring @sam to the Lisbon trip", "INVITE_PERSON"]
+    ["Bring @sam to the Lisbon trip", "INVITE_PERSON"],
+    ["Split the £96 hotel equally in London", "CREATE_EXPENSE"],
+    ["Make a birthday dinner group for next Friday", "CREATE_PLAN"]
   ])("resolves %s", (prompt, expected) => expect(deterministicIntent(prompt)).toBe(expected));
 
   it("matches one accessible plan by normalized name", () => {

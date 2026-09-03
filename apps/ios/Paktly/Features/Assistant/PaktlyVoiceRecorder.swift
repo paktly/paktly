@@ -1,32 +1,27 @@
 @preconcurrency import AVFoundation
 import Combine
 import Foundation
-@preconcurrency import Speech
 
 @MainActor
 final class PaktlyVoiceRecorder: ObservableObject {
-    enum RecorderError: Error { case microphonePermissionDenied, speechPermissionDenied, unavailable }
+    enum RecorderError: Error { case microphonePermissionDenied, unavailable }
 
     @Published private(set) var isRecording = false
     @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var liveTranscript = ""
     @Published private(set) var automaticallyCompletedURL: URL?
 
     private let audioEngine = AVAudioEngine()
     private var audioFile: AVAudioFile?
-    private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
-    private var speechTask: SFSpeechRecognitionTask?
     private var progressTask: Task<Void, Never>?
     private var recordingURL: URL?
     private var startedAt: ContinuousClock.Instant?
     private var inputTapInstalled = false
+    private var audioChunkHandler: (@Sendable (Data) -> Void)?
 
     var formattedDuration: String { String(format: "%d:%02d", Int(duration) / 60, Int(duration) % 60) }
 
-    func start() async throws {
+    func start(audioChunkHandler: (@Sendable (Data) -> Void)? = nil) async throws {
         guard await Self.requestMicrophonePermission() else { throw RecorderError.microphonePermissionDenied }
-        guard await Self.requestSpeechPermission() else { throw RecorderError.speechPermissionDenied }
-        guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else { throw RecorderError.unavailable }
 
         let session = AVAudioSession.sharedInstance()
         do {
@@ -39,25 +34,16 @@ final class PaktlyVoiceRecorder: ObservableObject {
 
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("paktly-\(UUID().uuidString).wav")
             let file = try AVAudioFile(forWriting: url, settings: format.settings)
-            let request = SFSpeechAudioBufferRecognitionRequest()
-            request.shouldReportPartialResults = true
-            request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
-
-            speechTask = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, _ in
-                guard let text = result?.bestTranscription.formattedString else { return }
-                Task { @MainActor [weak self] in self?.liveTranscript = text }
-            }
-
             input.installTap(onBus: 0, bufferSize: 1_024, format: format) { @Sendable buffer, _ in
-                request.append(buffer)
                 try? file.write(from: buffer)
+                if let data = Self.pcm16Mono24k(buffer: buffer, sourceRate: format.sampleRate) {
+                    audioChunkHandler?(data)
+                }
             }
             inputTapInstalled = true
 
             audioFile = file
-            speechRequest = request
             recordingURL = url
-            liveTranscript = ""
             duration = 0
             automaticallyCompletedURL = nil
             audioEngine.prepare()
@@ -103,16 +89,26 @@ final class PaktlyVoiceRecorder: ObservableObject {
             audioEngine.inputNode.removeTap(onBus: 0)
             inputTapInstalled = false
         }
-        speechRequest?.endAudio()
-        speechTask?.cancel()
-        speechTask = nil
-        speechRequest = nil
         audioFile = nil
         isRecording = false
         startedAt = nil
         if discarding, let recordingURL { try? FileManager.default.removeItem(at: recordingURL) }
-        if discarding { recordingURL = nil; liveTranscript = "" }
+        if discarding { recordingURL = nil }
+        audioChunkHandler = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    nonisolated private static func pcm16Mono24k(buffer: AVAudioPCMBuffer, sourceRate: Double) -> Data? {
+        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0, sourceRate > 0 else { return nil }
+        let sourceCount = Int(buffer.frameLength)
+        let outputCount = max(1, Int(Double(sourceCount) * 24_000 / sourceRate))
+        var output = Data(capacity: outputCount * 2)
+        for index in 0..<outputCount {
+            let sourceIndex = min(sourceCount - 1, Int(Double(index) * sourceRate / 24_000))
+            var sample = Int16(max(-1, min(1, channel[sourceIndex])) * Float(Int16.max)).littleEndian
+            withUnsafeBytes(of: &sample) { output.append(contentsOf: $0) }
+        }
+        return output
     }
 
     nonisolated private static func requestMicrophonePermission() async -> Bool {
@@ -121,15 +117,5 @@ final class PaktlyVoiceRecorder: ObservableObject {
         }
     }
 
-    nonisolated private static func requestSpeechPermission() async -> Bool {
-        switch SFSpeechRecognizer.authorizationStatus() {
-        case .authorized: return true
-        case .denied, .restricted: return false
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
-            }
-        @unknown default: return false
-        }
-    }
 }
+            self.audioChunkHandler = audioChunkHandler

@@ -45,6 +45,8 @@ const environmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(20).optional(),
   OPENAI_MODEL: z.string().min(1).default("gpt-5.4-mini"),
   OPENAI_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-4o-transcribe"),
+  OPENAI_REALTIME_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-live-transcribe"),
+  ASSISTANT_DRAFT_SECRET: z.string().min(32).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -99,6 +101,8 @@ export type Environment = {
     apiKey: string;
     model: string;
     transcriptionModel: string;
+    realtimeTranscriptionModel: string;
+    draftSecret: string;
   };
 };
 
@@ -164,8 +168,8 @@ export function loadEnvironment(
   if (parsed.data.APNS_ENABLED && (!source.APNS_TEAM_ID || !source.APNS_KEY_ID || !source.APNS_PRIVATE_KEY)) {
     throw new Error("Invalid environment configuration: APNS_TEAM_ID, APNS_KEY_ID, and APNS_PRIVATE_KEY are required when APNs is enabled");
   }
-  if (parsed.data.AI_ASSISTANT_ENABLED && !source.OPENAI_API_KEY) {
-    throw new Error("Invalid environment configuration: OPENAI_API_KEY is required when the AI assistant is enabled");
+  if (parsed.data.AI_ASSISTANT_ENABLED && (!source.OPENAI_API_KEY || !source.ASSISTANT_DRAFT_SECRET)) {
+    throw new Error("Invalid environment configuration: OPENAI_API_KEY and ASSISTANT_DRAFT_SECRET are required when the AI assistant is enabled");
   }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
@@ -229,7 +233,9 @@ export function loadEnvironment(
       enabled: parsed.data.AI_ASSISTANT_ENABLED,
       apiKey: parsed.data.OPENAI_API_KEY ?? "disabled",
       model: parsed.data.OPENAI_MODEL,
-      transcriptionModel: parsed.data.OPENAI_TRANSCRIPTION_MODEL
+      transcriptionModel: parsed.data.OPENAI_TRANSCRIPTION_MODEL,
+      realtimeTranscriptionModel: parsed.data.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+      draftSecret: parsed.data.ASSISTANT_DRAFT_SECRET ?? "development-only-assistant-draft-secret"
     }
   };
 }

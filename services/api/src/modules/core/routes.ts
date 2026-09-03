@@ -250,16 +250,20 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       });
 
       authenticated.post("/groups", async (request, reply) => {
-        const body = parse(z.object({ name: z.string().trim().min(1).max(100), description: z.string().trim().max(1000).nullable().optional(), defaultCurrency: currency.default("USD") }), request.body, app.httpErrors.badRequest);
+        const body = parse(z.object({ name: z.string().trim().min(1).max(100), description: z.string().trim().max(1000).nullable().optional(), defaultCurrency: currency.default("USD"), clientOperationId: uuid.optional() }), request.body, app.httpErrors.badRequest);
         const userId = request.authenticatedUser!.id;
+        if (body.clientOperationId) {
+          const [existing] = await app.db`SELECT id,name,description,default_currency FROM groups WHERE created_by=${userId} AND client_operation_id=${body.clientOperationId}`;
+          if (existing) return reply.status(200).send({ group: { ...existing, role: "OWNER" } });
+        }
         const groupId = randomUUID();
         await app.db.begin(async (tx) => {
-          await tx`INSERT INTO groups(id,name,description,default_currency,created_by) VALUES(${groupId},${body.name},${body.description ?? null},${body.defaultCurrency},${userId})`;
+          await tx`INSERT INTO groups(id,name,description,default_currency,created_by,client_operation_id) VALUES(${groupId},${body.name},${body.description ?? null},${body.defaultCurrency},${userId},${body.clientOperationId ?? null})`;
           await tx`INSERT INTO group_members(group_id,user_id,role) VALUES(${groupId},${userId},'OWNER')`;
           await tx`INSERT INTO ledger_accounts(id,group_id,user_id,currency) VALUES(${randomUUID()},${groupId},${userId},${body.defaultCurrency})`;
           await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${groupId},${userId},'GROUP_CREATED','GROUP',${groupId},${`${request.authenticatedUser!.displayName} created ${body.name}`})`;
         });
-        return reply.status(201).send({ group: { id: groupId, ...body, role: "OWNER" } });
+        return reply.status(201).send({ group: { id: groupId, name: body.name, description: body.description, defaultCurrency: body.defaultCurrency, role: "OWNER" } });
       });
 
       authenticated.get("/groups", async (request) => {

@@ -24,8 +24,8 @@ final class PaktlyVoiceRecorder: ObservableObject {
     var formattedDuration: String { String(format: "%d:%02d", Int(duration) / 60, Int(duration) % 60) }
 
     func start() async throws {
-        guard await requestMicrophonePermission() else { throw RecorderError.microphonePermissionDenied }
-        guard await requestSpeechPermission() else { throw RecorderError.speechPermissionDenied }
+        guard await Self.requestMicrophonePermission() else { throw RecorderError.microphonePermissionDenied }
+        guard await Self.requestSpeechPermission() else { throw RecorderError.speechPermissionDenied }
         guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else { throw RecorderError.unavailable }
 
         let session = AVAudioSession.sharedInstance()
@@ -43,12 +43,12 @@ final class PaktlyVoiceRecorder: ObservableObject {
             request.shouldReportPartialResults = true
             request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
 
-            speechTask = recognizer.recognitionTask(with: request) { [weak self] result, _ in
+            speechTask = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, _ in
                 guard let text = result?.bestTranscription.formattedString else { return }
                 Task { @MainActor [weak self] in self?.liveTranscript = text }
             }
 
-            input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
+            input.installTap(onBus: 0, bufferSize: 1_024, format: format) { @Sendable buffer, _ in
                 request.append(buffer)
                 try? file.write(from: buffer)
             }
@@ -115,13 +115,13 @@ final class PaktlyVoiceRecorder: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func requestMicrophonePermission() async -> Bool {
+    nonisolated private static func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
         }
     }
 
-    private func requestSpeechPermission() async -> Bool {
+    nonisolated private static func requestSpeechPermission() async -> Bool {
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized: return true
         case .denied, .restricted: return false

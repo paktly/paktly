@@ -10,6 +10,16 @@ struct GroupDetailView: View {
         case activity = "Activity"
 
         var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .overview: "square.grid.2x2"
+            case .expenses: "receipt"
+            case .balances: "arrow.left.arrow.right"
+            case .members: "person.2"
+            case .activity: "clock"
+            }
+        }
     }
 
     @EnvironmentObject private var model: AppModel
@@ -29,21 +39,16 @@ struct GroupDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let error {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                Label(error, systemImage: "exclamationmark.circle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(PaktlyColor.coral)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PaktlyColor.coral.opacity(0.1))
             }
 
-            Picker("Plan view", selection: $selectedTab) {
-                ForEach(PlanTab.allCases) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+            planTabBar
 
             ScrollView {
                 LazyVStack(spacing: 16, pinnedViews: []) {
@@ -108,13 +113,45 @@ struct GroupDetailView: View {
         .refreshable { await load() }
     }
 
+    private var planTabBar: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 7) {
+                ForEach(PlanTab.allCases) { tab in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) { selectedTab = tab }
+                    } label: {
+                        Label(tab.rawValue, systemImage: tab.icon)
+                            .font(.subheadline.weight(selectedTab == tab ? .semibold : .medium))
+                            .foregroundStyle(selectedTab == tab ? Color.white : PaktlyColor.secondaryInk)
+                            .padding(.horizontal, 14)
+                            .frame(height: 38)
+                            .background(
+                                selectedTab == tab ? PaktlyColor.forest : Color.clear,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+                }
+            }
+            .padding(5)
+        }
+        .scrollIndicators(.hidden)
+        .background(PaktlyColor.surface)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(PaktlyColor.secondaryInk.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
     private var planHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             if let group {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(group.name)
-                            .font(.title2.bold())
+                            .font(.system(.title2, design: .rounded, weight: .bold))
                             .foregroundStyle(PaktlyColor.ink)
 
                         if let description = group.description, !description.isEmpty {
@@ -124,26 +161,27 @@ struct GroupDetailView: View {
                                 .lineLimit(2)
                         }
 
-                        Text("\(members.count) members · \(group.defaultCurrency)")
-                            .font(.caption)
+                        Label("\(members.count) people · \(group.defaultCurrency)", systemImage: "person.2")
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(PaktlyColor.secondaryInk)
                     }
 
                     Spacer()
 
                     if let role = group.role, !role.isEmpty {
-                        Text(role)
-                            .font(.caption.weight(.semibold))
-                            .padding(.vertical, 8)
+                        Text(role.capitalized)
+                            .font(.caption2.weight(.bold))
+                            .padding(.vertical, 7)
                             .padding(.horizontal, 12)
-                            .background(PaktlyColor.mint.opacity(0.24))
+                            .foregroundStyle(PaktlyColor.forest)
+                            .background(PaktlyColor.mint.opacity(0.34))
                             .clipShape(Capsule())
                     }
                 }
             }
 
             if let ownBalance = ownNetMinor {
-                HStack(spacing: 14) {
+                HStack(alignment: .top, spacing: 10) {
                     metric("You owe", value: ownBalance < 0 ? currencyFormatter(-ownBalance, currency: group?.defaultCurrency ?? "USD") : nil, tone: .negative)
                     metric("You're owed", value: ownBalance > 0 ? currencyFormatter(ownBalance, currency: group?.defaultCurrency ?? "USD") : nil, tone: .positive)
                 }
@@ -153,18 +191,19 @@ struct GroupDetailView: View {
                 suggestedSettlePanel
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PaktlyColor.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(PaktlyColor.secondaryInk.opacity(0.1), lineWidth: 1)
         )
+        .shadow(color: PaktlyColor.forest.opacity(0.07), radius: 18, y: 8)
     }
 
     private var overviewContent: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Latest expenses")
             if expenses.isEmpty {
                 contentUnavailable("No expenses yet", "Your first split will appear here.")
@@ -206,7 +245,7 @@ struct GroupDetailView: View {
     }
 
     private var expensesContent: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Expenses")
             if expenses.isEmpty {
                 contentUnavailable("No expenses yet", "Add your first expense to start splitting automatically.")
@@ -219,7 +258,7 @@ struct GroupDetailView: View {
     }
 
     private var balancesContent: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Balances")
             ForEach(balances) { row in
                 HStack {
@@ -241,7 +280,7 @@ struct GroupDetailView: View {
     }
 
     private var membersContent: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 sectionTitle("Members")
                 Spacer()
@@ -279,7 +318,7 @@ struct GroupDetailView: View {
     }
 
     private var activityContent: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Activity")
             if events.isEmpty {
                 contentUnavailable("No activity yet", "Edits, invites and settlements will show here.")
@@ -439,24 +478,19 @@ struct GroupDetailView: View {
     }
 
     private func metric(_ title: String, value: String?, tone: MetricTone) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(title)
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .foregroundStyle(PaktlyColor.secondaryInk)
-            Spacer()
-            Text(value ?? "$0.00")
-                .font(.headline.weight(.bold))
+            Text(value ?? currencyFormatter(0, currency: group?.defaultCurrency ?? "USD"))
+                .font(.system(.title3, design: .rounded, weight: .bold))
                 .foregroundStyle(tone.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity)
-        .background(PaktlyColor.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(tone.color.opacity(0.35), lineWidth: 1)
-        )
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
+        .background(tone.background, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
     }
 
     private func currencyFormatter(_ minor: Int, currency: String) -> String {
@@ -499,6 +533,13 @@ struct GroupDetailView: View {
                 return PaktlyColor.forest
             case .negative:
                 return PaktlyColor.coral
+            }
+        }
+
+        var background: Color {
+            switch self {
+            case .positive: PaktlyColor.mint.opacity(0.24)
+            case .negative: PaktlyColor.coral.opacity(0.1)
             }
         }
     }

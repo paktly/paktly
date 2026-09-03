@@ -28,6 +28,11 @@ describe("loadEnvironment", () => {
         privateKey: "disabled",
         bundleId: "io.paktly.app"
       },
+      assistant: {
+        enabled: false,
+        apiKey: "disabled",
+        model: "gpt-5.4-mini"
+      },
       logLevel: "info",
       nodeEnvironment: "development",
       rateLimitMax: 300,
@@ -86,6 +91,16 @@ describe("loadEnvironment", () => {
     expect(() => loadEnvironment({
       EMAIL_AUTH_ENABLED: "true"
     })).toThrow("EMAIL_OTP_SECRET, SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD");
+  });
+
+  it("requires an OpenAI key whenever Ask Paktly is enabled", () => {
+    expect(() => loadEnvironment({ AI_ASSISTANT_ENABLED: "true" })).toThrow(
+      "OPENAI_API_KEY is required"
+    );
+    expect(loadEnvironment({
+      AI_ASSISTANT_ENABLED: "true",
+      OPENAI_API_KEY: "sk-test-key-that-is-long-enough"
+    }).assistant).toMatchObject({ enabled: true, model: "gpt-5.4-mini" });
   });
 
   it("loads a secure SMTP email transport", () => {

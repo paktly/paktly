@@ -23,6 +23,7 @@ struct GlobalAddCenterView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingCreatePlan = false
+    @State private var showingAskPaktly = false
     @State private var expenseContext: ExpensePlanContext?
     @State private var invitePlan: APIGroup?
     @State private var loadingAction: GlobalAddAction?
@@ -47,6 +48,16 @@ struct GlobalAddCenterView: View {
                     }
 
                     VStack(spacing: 10) {
+                        Button { showingAskPaktly = true } label: {
+                            actionRow(
+                                title: "Ask Paktly",
+                                subtitle: "Describe what you want to add in your own words.",
+                                icon: "sparkles",
+                                tint: PaktlyColor.mint
+                            )
+                        }
+                        .buttonStyle(.plain)
+
                         contextualActionButton(
                             title: "Add expense",
                             subtitle: "Record a cost and split it with your people.",
@@ -98,6 +109,10 @@ struct GlobalAddCenterView: View {
             }
             .sheet(isPresented: $showingCreatePlan) {
                 CreatePlanView().environmentObject(model)
+            }
+            .sheet(isPresented: $showingAskPaktly) {
+                AskPaktlyView(contextPlanID: model.activePlanId)
+                    .environmentObject(model)
             }
             .sheet(item: $expenseContext) { context in
                 ExpenseEditorView(

@@ -53,6 +53,22 @@ struct APIInvitation: Codable, Identifiable, Sendable, Equatable {
     let groupName: String
     let inviterName: String
 }
+
+struct APIAssistantDraft: Codable, Sendable {
+    let intent: String
+    let summary: String
+    let needsClarification: Bool
+    let clarification: String?
+    let planId: String?
+    let description: String?
+    let amountMinor: Int?
+    let currency: String?
+    let payerId: String?
+    let participantIds: [String]
+    let planName: String?
+    let planDescription: String?
+    let inviteIdentifier: String?
+}
 struct APIJoinLinkPreview: Codable, Identifiable, Sendable, Equatable {
     let id: String
     let groupId: String
@@ -257,6 +273,11 @@ private struct InvitationPayload: Decodable {
 private struct InvitationResponse: Decodable {
     let invitation: InvitationPayload
 }
+private struct AssistantInterpretRequest: Encodable {
+    let prompt: String
+    let contextPlanId: String?
+}
+private struct AssistantInterpretResponse: Decodable { let draft: APIAssistantDraft }
 
 private struct PendingInvitationsResponse: Decodable {
     let invitations: [APIInvitation]
@@ -481,6 +502,16 @@ actor APIClient {
             body: body
         )
         return response.group
+    }
+
+    func interpretAssistant(prompt: String, contextPlanId: String?) async throws -> APIAssistantDraft {
+        let response = try await send(
+            AssistantInterpretResponse.self,
+            path: "assistant/interpret",
+            method: "POST",
+            body: AssistantInterpretRequest(prompt: prompt, contextPlanId: contextPlanId)
+        )
+        return response.draft
     }
 
     func group(_ id: String) async throws -> (APIGroup, [APIGroupMember]) {

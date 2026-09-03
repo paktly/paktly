@@ -41,6 +41,9 @@ const environmentSchema = z.object({
   APNS_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/).optional(),
   APNS_PRIVATE_KEY: z.string().min(100).optional(),
   APNS_BUNDLE_ID: z.string().min(3).default("io.paktly.app"),
+  AI_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  OPENAI_API_KEY: z.string().min(20).optional(),
+  OPENAI_MODEL: z.string().min(1).default("gpt-5.4-mini"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -89,6 +92,11 @@ export type Environment = {
     keyId: string;
     privateKey: string;
     bundleId: string;
+  };
+  assistant?: {
+    enabled: boolean;
+    apiKey: string;
+    model: string;
   };
 };
 
@@ -154,6 +162,9 @@ export function loadEnvironment(
   if (parsed.data.APNS_ENABLED && (!source.APNS_TEAM_ID || !source.APNS_KEY_ID || !source.APNS_PRIVATE_KEY)) {
     throw new Error("Invalid environment configuration: APNS_TEAM_ID, APNS_KEY_ID, and APNS_PRIVATE_KEY are required when APNs is enabled");
   }
+  if (parsed.data.AI_ASSISTANT_ENABLED && !source.OPENAI_API_KEY) {
+    throw new Error("Invalid environment configuration: OPENAI_API_KEY is required when the AI assistant is enabled");
+  }
 
   const trustedProxies = parsed.data.TRUST_PROXY.split(",")
     .map((value) => value.trim())
@@ -211,6 +222,11 @@ export function loadEnvironment(
       keyId: parsed.data.APNS_KEY_ID ?? "0000000000",
       privateKey: parsed.data.APNS_PRIVATE_KEY ?? "disabled",
       bundleId: parsed.data.APNS_BUNDLE_ID
+    },
+    assistant: {
+      enabled: parsed.data.AI_ASSISTANT_ENABLED,
+      apiKey: parsed.data.OPENAI_API_KEY ?? "disabled",
+      model: parsed.data.OPENAI_MODEL
     }
   };
 }

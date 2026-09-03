@@ -28,7 +28,7 @@ struct PaktlyApp: App {
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .paktlyDidOpenRemoteNotification)) { notification in
-                    if let payload = notification.object as? [AnyHashable: Any] {
+                    if let payload = notification.object as? [String: String] {
                         model.handleRemoteNotification(payload)
                     }
                 }

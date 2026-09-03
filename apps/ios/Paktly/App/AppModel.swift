@@ -90,16 +90,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func handleRemoteNotification(_ payload: [AnyHashable: Any]) {
-        let normalized = payload.reduce(into: [String: String]()) { result, item in
-            if let key = item.key as? String, let value = item.value as? String { result[key] = value }
-        }
+    func handleRemoteNotification(_ payload: [String: String]) {
         guard KeychainTokenStore.load() != nil else {
-            PendingPushStore.save(normalized)
+            PendingPushStore.save(payload)
             return
         }
         Task {
-            await routeRemoteNotification(normalized)
+            await routeRemoteNotification(payload)
         }
     }
 

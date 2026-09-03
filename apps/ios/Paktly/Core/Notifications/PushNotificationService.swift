@@ -138,7 +138,15 @@ final class PushNotificationService: NSObject, ObservableObject, UNUserNotificat
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        let payload = response.notification.request.content.userInfo
+        let payload = response.notification.request.content.userInfo.reduce(into: [String: String]()) { result, item in
+            guard let key = item.key as? String else { return }
+
+            if let value = item.value as? String {
+                result[key] = value
+            } else if let value = item.value as? NSNumber {
+                result[key] = value.stringValue
+            }
+        }
         await MainActor.run {
             NotificationCenter.default.post(name: .paktlyDidOpenRemoteNotification, object: payload)
         }

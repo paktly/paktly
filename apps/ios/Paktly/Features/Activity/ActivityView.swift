@@ -6,94 +6,54 @@ struct ActivityView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 20) {
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Activity")
-                                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                                .foregroundStyle(PaktlyColor.ink)
-                            Text("What’s happening across your plans.")
-                                .font(.subheadline)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
-                        }
-                        Spacer()
-                        if model.unreadNotificationCount > 0 {
-                            Button("Read all") {
-                                Task {
-                                    try? await model.client.markAllNotificationsRead()
-                                    await model.refresh()
-                                }
-                            }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(PaktlyColor.forest)
-                        }
-                        Button { Task { await load() } } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(PaktlyColor.forest)
-                                .frame(width: 44, height: 44)
-                                .background(PaktlyColor.surface, in: Circle())
-                        }
-                    }
-
-                    if !model.invitations.isEmpty {
-                        invitationsSection
-                    }
-
-                    activitySection
-
-                    if !model.notifications.isEmpty {
-                        notificationsSection
-                    }
-
-                    Spacer(minLength: 20)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 28)
-            }
-            .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationBarHidden(true)
-            .task { await load() }
-            .refreshable { await load() }
-        }
-    }
-
-    private var invitationsSection: some View {
-        card {
-            VStack(alignment: .leading, spacing: 12) {
-                PaktlySectionHeader(title: "Invitations")
-                ForEach(model.invitations) { invitation in
-                    Button { model.presentInvitation(invitation) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.2.badge.plus")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(PaktlyColor.forest)
-                                .frame(width: 40, height: 40)
-                                .background(PaktlyColor.mint.opacity(0.38), in: Circle())
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(invitation.groupName)
-                                    .font(.subheadline.weight(.semibold))
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 20) {
+                        HStack(alignment: .bottom) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Activity")
+                                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
                                     .foregroundStyle(PaktlyColor.ink)
-                                Text("Invited by \(invitation.inviterName)")
-                                    .font(.caption)
+                                Text("What’s happening across your plans.")
+                                    .font(.subheadline)
                                     .foregroundStyle(PaktlyColor.secondaryInk)
                             }
                             Spacer()
-                            Text("Review")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(PaktlyColor.forest)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            Button { Task { await load() } } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(PaktlyColor.forest)
+                                    .frame(width: 44, height: 44)
+                                    .background(PaktlyColor.surface, in: Circle())
+                            }
                         }
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
+
+                        activitySection
+
+                        Spacer(minLength: 20)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
+                }
+                .background(PaktlyColor.background.ignoresSafeArea())
+                .refreshable { await load() }
+                .task {
+                    await load()
+                    scrollToFocus(using: proxy)
+                }
+                .onChange(of: model.focusedActivityEntityId) { _, _ in
+                    scrollToFocus(using: proxy)
                 }
             }
+            .navigationBarHidden(true)
+        }
+    }
+
+    private func scrollToFocus(using proxy: ScrollViewProxy) {
+        guard let focused = model.focusedActivityEntityId else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            proxy.scrollTo(focused, anchor: .center)
         }
     }
 
@@ -121,53 +81,17 @@ struct ActivityView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 8)
+                        .padding(10)
+                        .background(
+                            event.entityId == model.focusedActivityEntityId
+                                ? PaktlyColor.mint.opacity(0.25)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        )
+                        .id(event.entityId ?? event.id)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                }
-            }
-        }
-    }
-
-    private var notificationsSection: some View {
-        card {
-            VStack(alignment: .leading, spacing: 12) {
-                PaktlySectionHeader(title: "Notifications")
-
-                ForEach(model.notifications) { item in
-                    Button {
-                        Task {
-                            try? await model.client.markNotificationRead(id: item.id)
-                            await model.refresh()
-                        }
-                    } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            if item.readAt == nil {
-                                Circle()
-                                    .fill(PaktlyColor.coral)
-                                    .frame(width: 8, height: 8)
-                                    .padding(.top, 6)
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(PaktlyColor.ink)
-                                Text(item.body)
-                                    .font(.caption)
-                                    .foregroundStyle(PaktlyColor.secondaryInk)
-                                    .multilineTextAlignment(.leading)
-                            }
-                        }
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-
-                    if item.id != model.notifications.last?.id {
-                        Divider()
-                    }
                 }
             }
         }

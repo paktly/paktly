@@ -29,6 +29,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var invitationError: String?
     @Published private(set) var presentedPlan: PresentedPlan?
     @Published private(set) var presentedJoinLink: PresentedJoinLink?
+    @Published private(set) var focusedActivityEntityId: String?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -127,6 +128,25 @@ final class AppModel: ObservableObject {
     }
 
     func dismissPresentedPlan() { presentedPlan = nil }
+
+    func openNotification(_ notification: APINotification) async {
+        if notification.readAt == nil {
+            try? await client.markNotificationRead(id: notification.id)
+        }
+
+        if notification.entityType == "INVITATION",
+           let invitation = invitations.first(where: { $0.id == notification.entityId }) {
+            presentInvitation(invitation)
+        } else {
+            focusedActivityEntityId = notification.entityId
+        }
+
+        if let loadedNotifications = try? await client.notifications() {
+            notifications = loadedNotifications.0
+            unreadNotificationCount = loadedNotifications.1
+            try? await UNUserNotificationCenter.current().setBadgeCount(loadedNotifications.1)
+        }
+    }
 
     func previewJoinCode(_ code: String) async throws {
         let preview = try await client.previewJoinLink(code: code)

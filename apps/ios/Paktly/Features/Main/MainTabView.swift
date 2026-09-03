@@ -17,7 +17,7 @@ private enum PaktlyTab: String, CaseIterable {
         switch self {
         case .home: "house"
         case .plans: "square.stack.3d.up"
-        case .activity: "bell"
+        case .activity: "clock"
         case .balances: "creditcard"
         case .profile: "person"
         }
@@ -27,10 +27,11 @@ private enum PaktlyTab: String, CaseIterable {
 struct MainTabView: View {
     @EnvironmentObject private var model: AppModel
     @State private var selection: PaktlyTab = .home
+    @State private var showingNotifications = false
 
     var body: some View {
         TabView(selection: $selection) {
-            HomeView().tag(PaktlyTab.home)
+            HomeView(showingNotifications: $showingNotifications).tag(PaktlyTab.home)
             GroupsView().tag(PaktlyTab.plans)
             ActivityView().tag(PaktlyTab.activity)
             BalancesOverviewView().tag(PaktlyTab.balances)
@@ -38,6 +39,18 @@ struct MainTabView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
+        .sheet(isPresented: $showingNotifications) {
+            NotificationCenterView { notification in
+                Task {
+                    await model.openNotification(notification)
+                    showingNotifications = false
+                    if notification.entityType != "INVITATION" {
+                        selection = .activity
+                    }
+                }
+            }
+            .environmentObject(model)
+        }
         .task {
             await model.refresh()
             await PushNotificationService.shared.activateIfAuthorized()
@@ -85,15 +98,6 @@ struct MainTabView: View {
                             Image(systemName: selection == tab ? "\(tab.icon).fill" : tab.icon)
                                 .font(.system(size: 17, weight: .semibold))
                                 .frame(height: 20)
-                            if tab == .activity && model.unreadNotificationCount > 0 {
-                                Text(model.unreadNotificationCount > 99 ? "99+" : "\(model.unreadNotificationCount)")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 4)
-                                    .frame(minWidth: 16, minHeight: 16)
-                                    .background(PaktlyColor.coral, in: Capsule())
-                                    .offset(x: 12, y: -7)
-                            }
                         }
                         Text(tab.title)
                             .font(.system(size: 10, weight: selection == tab ? .bold : .medium))

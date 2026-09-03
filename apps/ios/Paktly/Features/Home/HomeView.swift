@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var model: AppModel
+    @Binding var showingNotifications: Bool
 
     private var firstName: String {
         model.currentUser?.displayName.split(separator: " ").first.map(String.init) ?? "there"
@@ -45,11 +46,36 @@ struct HomeView: View {
                 Text("\(greeting), \(firstName)")
                     .font(.system(.title2, design: .rounded, weight: .bold))
                     .foregroundStyle(PaktlyColor.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                     .font(.subheadline)
                     .foregroundStyle(PaktlyColor.secondaryInk)
             }
             Spacer()
+            Button {
+                showingNotifications = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(PaktlyColor.forest)
+                        .frame(width: 46, height: 46)
+                        .background(PaktlyColor.surface, in: Circle())
+
+                    if model.unreadNotificationCount > 0 {
+                        Text(model.unreadNotificationCount > 99 ? "99+" : "\(model.unreadNotificationCount)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(PaktlyColor.coral, in: Capsule())
+                            .offset(x: 4, y: -3)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.unreadNotificationCount == 0 ? "Notifications" : "Notifications, \(model.unreadNotificationCount) unread")
             PaktlyAvatar(name: firstName, size: 46)
         }
     }

@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var showingNotifications: Bool
+    let onOpenBalances: () -> Void
 
     private var firstName: String {
         model.currentUser?.displayName.split(separator: " ").first.map(String.init) ?? "there"
@@ -96,11 +97,15 @@ struct HomeView: View {
                         .foregroundStyle(Color.white.opacity(0.72))
                 }
                 Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(PaktlyColor.forest)
-                    .padding(11)
-                    .background(.white, in: Circle())
+                Button(action: onOpenBalances) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(PaktlyColor.forest)
+                        .padding(11)
+                        .background(.white, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View all balances")
             }
 
             HStack(spacing: 0) {

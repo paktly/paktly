@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var presentedPlan: PresentedPlan?
     @Published private(set) var presentedJoinLink: PresentedJoinLink?
     @Published private(set) var focusedActivityEntityId: String?
+    @Published private(set) var activePlanId: String?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -128,6 +129,10 @@ final class AppModel: ObservableObject {
     }
 
     func dismissPresentedPlan() { presentedPlan = nil }
+
+    func setActivePlan(_ id: String?) {
+        activePlanId = id
+    }
 
     func openNotification(_ notification: APINotification) async {
         if notification.readAt == nil {

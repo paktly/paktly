@@ -1,14 +1,13 @@
 import SwiftUI
 
 private enum PaktlyTab: String, CaseIterable {
-    case home, plans, activity, balances, profile
+    case home, plans, activity, profile
 
     var title: String {
         switch self {
         case .home: "Home"
         case .plans: "Plans"
         case .activity: "Activity"
-        case .balances: "Balances"
         case .profile: "You"
         }
     }
@@ -18,7 +17,6 @@ private enum PaktlyTab: String, CaseIterable {
         case .home: "house"
         case .plans: "square.stack.3d.up"
         case .activity: "clock"
-        case .balances: "creditcard"
         case .profile: "person"
         }
     }
@@ -28,13 +26,18 @@ struct MainTabView: View {
     @EnvironmentObject private var model: AppModel
     @State private var selection: PaktlyTab = .home
     @State private var showingNotifications = false
+    @State private var showingAddCenter = false
+    @State private var showingBalances = false
 
     var body: some View {
         TabView(selection: $selection) {
-            HomeView(showingNotifications: $showingNotifications).tag(PaktlyTab.home)
+            HomeView(
+                showingNotifications: $showingNotifications,
+                onOpenBalances: { showingBalances = true }
+            )
+            .tag(PaktlyTab.home)
             GroupsView().tag(PaktlyTab.plans)
             ActivityView().tag(PaktlyTab.activity)
-            BalancesOverviewView().tag(PaktlyTab.balances)
             ProfileView().tag(PaktlyTab.profile)
         }
         .toolbar(.hidden, for: .tabBar)
@@ -50,6 +53,16 @@ struct MainTabView: View {
                 }
             }
             .environmentObject(model)
+        }
+        .sheet(isPresented: $showingAddCenter) {
+            GlobalAddCenterView()
+                .environmentObject(model)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingBalances) {
+            BalancesOverviewView()
+                .environmentObject(model)
         }
         .task {
             await model.refresh()
@@ -89,34 +102,11 @@ struct MainTabView: View {
 
     private var tabBar: some View {
         HStack(spacing: 2) {
-            ForEach(PaktlyTab.allCases, id: \.self) { tab in
-                Button {
-                    withAnimation(.easeOut(duration: 0.2)) { selection = tab }
-                } label: {
-                    VStack(spacing: 4) {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: selection == tab ? "\(tab.icon).fill" : tab.icon)
-                                .font(.system(size: 17, weight: .semibold))
-                                .frame(height: 20)
-                        }
-                        Text(tab.title)
-                            .font(.system(size: 10, weight: selection == tab ? .bold : .medium))
-                    }
-                    .foregroundStyle(selection == tab ? PaktlyColor.forest : PaktlyColor.secondaryInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background {
-                        if selection == tab {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(PaktlyColor.mint.opacity(0.28))
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
-            }
+            tabButton(.home)
+            tabButton(.plans)
+            addButton
+            tabButton(.activity)
+            tabButton(.profile)
         }
         .padding(6)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -128,6 +118,56 @@ struct MainTabView: View {
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 4)
+    }
+
+    private func tabButton(_ tab: PaktlyTab) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) { selection = tab }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: selection == tab ? "\(tab.icon).fill" : tab.icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(height: 20)
+                Text(tab.title)
+                    .font(.system(size: 10, weight: selection == tab ? .bold : .medium))
+            }
+            .foregroundStyle(selection == tab ? PaktlyColor.forest : PaktlyColor.secondaryInk)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background {
+                if selection == tab {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(PaktlyColor.mint.opacity(0.28))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(selection == tab ? .isSelected : [])
+    }
+
+    private var addButton: some View {
+        Button {
+            showingAddCenter = true
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: "plus")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(PaktlyColor.forest, in: Circle())
+                    .shadow(color: PaktlyColor.forest.opacity(0.24), radius: 8, y: 4)
+                Text("Add")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(PaktlyColor.forest)
+            }
+            .frame(maxWidth: .infinity)
+            .offset(y: -5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add")
+        .accessibilityHint("Create a plan, expense, or invitation")
     }
 }
 

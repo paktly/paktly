@@ -110,6 +110,10 @@ struct GroupDetailView: View {
         }) {
             InviteView(groupID: groupID, canManageJoinLink: ["OWNER", "ADMIN"].contains(group?.role ?? ""))
         }
+        .onAppear { model.setActivePlan(groupID) }
+        .onDisappear {
+            if model.activePlanId == groupID { model.setActivePlan(nil) }
+        }
         .task { await load() }
     }
 
@@ -545,7 +549,7 @@ struct GroupDetailView: View {
     }
 }
 
-private struct InviteView: View {
+struct InviteView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let groupID: String

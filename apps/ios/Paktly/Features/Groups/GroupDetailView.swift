@@ -561,6 +561,7 @@ struct InviteView: View {
     @State private var sentIdentifier: String?
     @State private var joinLink: APIJoinLink?
     @State private var creatingLink = false
+    @State private var copiedLink = false
 
     private var normalizedIdentifier: String {
         identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -647,20 +648,27 @@ struct InviteView: View {
                                             Text(joinLink.code).font(.title3.monospaced().weight(.bold)).foregroundStyle(PaktlyColor.ink)
                                         }
                                         Spacer()
-                                        ShareLink(item: joinLink.url) {
-                                            Label("Share", systemImage: "square.and.arrow.up")
-                                                .font(.subheadline.weight(.semibold))
-                                        }
                                     }
                                     Text("Expires \(joinLink.expiresAt, style: .relative) · Up to \(joinLink.maxUses) joins")
                                         .font(.caption)
                                         .foregroundStyle(PaktlyColor.secondaryInk)
-                                    HStack {
-                                        Button("Copy link") { UIPasteboard.general.url = joinLink.url }
-                                        Spacer()
-                                        Button("Revoke", role: .destructive) { Task { await revokeJoinLink() } }
+                                    HStack(spacing: 10) {
+                                        ShareLink(item: joinLink.url) {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(PaktlyColor.forest)
+
+                                        Button { copy(joinLink.url) } label: {
+                                            Label(copiedLink ? "Copied" : "Copy", systemImage: copiedLink ? "checkmark" : "doc.on.doc")
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.bordered)
                                     }
                                     .font(.subheadline.weight(.semibold))
+                                    Button("Revoke link", role: .destructive) { Task { await revokeJoinLink() } }
+                                        .font(.footnote.weight(.semibold))
                                 }
                                 .padding(16)
                                 .background(PaktlyColor.mint.opacity(0.2), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
@@ -727,10 +735,21 @@ struct InviteView: View {
         errorMessage = nil
         do {
             joinLink = try await model.client.createJoinLink(groupID: groupID)
+            copiedLink = false
         } catch {
             errorMessage = "We couldn’t create a share link. Please try again."
         }
         creatingLink = false
+    }
+
+    private func copy(_ url: URL) {
+        UIPasteboard.general.url = url
+        copiedLink = true
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            copiedLink = false
+        }
     }
 
     private func revokeJoinLink() async {

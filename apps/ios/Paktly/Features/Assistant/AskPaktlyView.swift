@@ -26,7 +26,7 @@ struct AskPaktlyView: View {
                             .multilineTextAlignment(.center)
                     }
                     Label(
-                        "Your recording is sent to Paktly’s AI provider for transcription. Paktly removes the local recording after processing.",
+                        "Apple Speech provides the live words when available. Your completed recording is sent to Paktly’s AI provider, then removed from this device.",
                         systemImage: "lock.shield"
                     )
                     .font(.caption)
@@ -87,6 +87,16 @@ struct AskPaktlyView: View {
                 Text(recorder.formattedDuration)
                     .font(.system(.body, design: .monospaced, weight: .semibold))
                     .foregroundStyle(PaktlyColor.coral)
+            }
+            if recorder.isRecording, !recorder.liveTranscript.isEmpty {
+                Text(recorder.liveTranscript)
+                    .font(.body)
+                    .foregroundStyle(PaktlyColor.ink)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 330)
+                    .padding(15)
+                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                    .accessibilityLabel("Live transcript: \(recorder.liveTranscript)")
             }
         }
         .padding(.top, 8)
@@ -180,8 +190,10 @@ struct AskPaktlyView: View {
         isStarting = true
         defer { isStarting = false }
         do { try await recorder.start() }
-        catch PaktlyVoiceRecorder.RecorderError.permissionDenied {
+        catch PaktlyVoiceRecorder.RecorderError.microphonePermissionDenied {
             errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
+        } catch PaktlyVoiceRecorder.RecorderError.speechPermissionDenied {
+            errorMessage = "Speech Recognition access is off. Enable it for Paktly in Settings to see words while you speak."
         } catch { errorMessage = "We couldn’t start recording. Please try again." }
     }
 

@@ -520,8 +520,8 @@ actor APIClient {
         let boundary = "PaktlyBoundary-\(UUID().uuidString)"
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"command.m4a\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: audio/mp4\r\n\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"command.wav\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(audio)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 

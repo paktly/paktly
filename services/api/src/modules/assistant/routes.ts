@@ -77,7 +77,8 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
           environment.assistant.model,
           environment.assistant.transcriptionModel
         );
-        return { transcript: await provider.transcribe(audio, "paktly-command.m4a", part.mimetype) };
+        const extension = part.mimetype === "audio/wav" ? "wav" : part.mimetype === "audio/mpeg" ? "mp3" : "m4a";
+        return { transcript: await provider.transcribe(audio, `paktly-command.${extension}`, part.mimetype) };
       } catch (error) {
         request.log.error({ err: error }, "Speak to Paktly transcription failed");
         throw app.httpErrors.serviceUnavailable("Paktly couldn’t hear that clearly. Please try again.");

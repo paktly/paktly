@@ -198,14 +198,25 @@ struct AskPaktlyView: View {
     }
 
     private func process(_ url: URL) {
-        isProcessing = true; errorMessage = nil
+        let liveText = recorder.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        isProcessing = true
+        errorMessage = nil
         Task {
             defer { try? FileManager.default.removeItem(at: url); isProcessing = false }
             do {
-                let text = try await model.client.transcribeAssistant(audioURL: url)
+                let text: String
+                if liveText.count >= 2 {
+                    text = liveText
+                } else {
+                    text = try await model.client.transcribeAssistant(audioURL: url)
+                }
                 transcript = text
                 draft = try await model.client.interpretAssistant(prompt: text, contextPlanId: contextPlanID)
-            } catch { errorMessage = "Paktly couldn’t hear that clearly. Please record again." }
+            } catch {
+                errorMessage = liveText.count >= 2
+                    ? "Paktly couldn’t turn that into an action. Please try again or use the standard form."
+                    : "Paktly couldn’t hear that clearly. Please record again."
+            }
         }
     }
 

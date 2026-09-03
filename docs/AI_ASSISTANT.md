@@ -2,7 +2,7 @@
 
 Speak to Paktly converts a short voice command into a reviewable action draft. It supports creating an equal-split expense, creating a plan, and inviting one person.
 
-The iOS app records a short audio command, shows an on-device live transcript while the user speaks, and sends the completed recording to authenticated `POST /api/v1/assistant/transcribe`. The backend creates the final transcript, and then `POST /api/v1/assistant/interpret` supplies only that transcript plus the current user's accessible plans and active members to OpenAI for a strict structured response. Neither endpoint mutates product data. The user must review and explicitly confirm the draft before Paktly calls its existing typed mutation endpoints. The iOS app never receives an OpenAI API key.
+The iOS app records a short audio command and shows a live transcript while the user speaks. When live text is available, it is sent directly to `POST /api/v1/assistant/interpret`; completed-audio transcription remains a fallback when the device produces no live text. The interpretation endpoint supplies only the transcript plus the current user's accessible plans and active members to OpenAI for a strict structured response. Neither endpoint mutates product data. The user must review and explicitly confirm the draft before Paktly calls its existing typed mutation endpoints. The iOS app never receives an OpenAI API key.
 
 ## Production configuration
 

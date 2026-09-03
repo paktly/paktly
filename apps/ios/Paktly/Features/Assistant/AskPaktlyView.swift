@@ -8,7 +8,9 @@ struct AskPaktlyView: View {
     @State private var transcript: String?
     @State private var draft: APIAssistantDraft?
     @State private var isProcessing = false
+    @State private var isStarting = false
     @State private var isConfirming = false
+    @State private var attemptedAutomaticStart = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -45,6 +47,11 @@ struct AskPaktlyView: View {
             .onChange(of: recorder.automaticallyCompletedURL) { _, url in
                 if let url { process(url) }
             }
+            .task {
+                guard !attemptedAutomaticStart else { return }
+                attemptedAutomaticStart = true
+                await startRecording()
+            }
         }
     }
 
@@ -57,13 +64,17 @@ struct AskPaktlyView: View {
                     .scaleEffect(recorder.isRecording ? 1.06 : 1)
                     .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: recorder.isRecording)
                 Button { toggleRecording() } label: {
-                    Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
+                    Group {
+                        if isStarting { ProgressView().tint(.white) }
+                        else { Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill") }
+                    }
                         .font(.system(size: 38, weight: .semibold)).foregroundStyle(.white)
                         .frame(width: 92, height: 92)
                         .background(recorder.isRecording ? PaktlyColor.coral : PaktlyColor.forest, in: Circle())
                         .shadow(color: PaktlyColor.forest.opacity(0.18), radius: 18, y: 9)
                 }
-                .buttonStyle(.plain).disabled(isProcessing || isConfirming)
+                .buttonStyle(.plain).disabled(isStarting || isProcessing || isConfirming)
+                .accessibilityLabel(recorder.isRecording ? "Stop recording" : "Start recording")
             }
             VStack(spacing: 7) {
                 Text(stageTitle)
@@ -82,6 +93,7 @@ struct AskPaktlyView: View {
     }
 
     private var stageTitle: String {
+        if isStarting { return "Getting ready…" }
         if isProcessing { return "Understanding…" }
         if recorder.isRecording { return "Listening…" }
         if draft != nil { return "Ready for your review" }
@@ -89,6 +101,7 @@ struct AskPaktlyView: View {
     }
 
     private var stageSubtitle: String {
+        if isStarting { return "Paktly will begin listening automatically." }
         if isProcessing { return "Turning your recording into a clear action." }
         if recorder.isRecording { return "Tap stop when you’re finished. Recordings end automatically after one minute." }
         if draft != nil { return "Nothing changes until you confirm below." }
@@ -99,7 +112,7 @@ struct AskPaktlyView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("I HEARD").font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(PaktlyColor.secondaryInk)
             Text("“\(value)”").font(.body).foregroundStyle(PaktlyColor.ink)
-            Button("Record again") { reset() }
+            Button("Record again") { Task { await startRecording() } }
                 .font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.forest)
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(17)
@@ -118,7 +131,8 @@ struct AskPaktlyView: View {
                 } else if value.needsClarification {
                     Text(value.clarification ?? "Please record again with a little more detail.")
                         .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
-                    Button("Record with more detail") { reset() }.buttonStyle(PaktlySecondaryButtonStyle())
+                    Button("Record with more detail") { Task { await startRecording() } }
+                        .buttonStyle(PaktlySecondaryButtonStyle())
                 } else {
                     reviewDetails(value)
                     Button { confirm(value) } label: {
@@ -157,14 +171,18 @@ struct AskPaktlyView: View {
             guard let url = recorder.stop() else { return }
             process(url)
         } else {
-            reset()
-            Task {
-                do { try await recorder.start() }
-                catch PaktlyVoiceRecorder.RecorderError.permissionDenied {
-                    errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
-                } catch { errorMessage = "We couldn’t start recording. Please try again." }
-            }
+            Task { await startRecording() }
         }
+    }
+
+    private func startRecording() async {
+        reset()
+        isStarting = true
+        defer { isStarting = false }
+        do { try await recorder.start() }
+        catch PaktlyVoiceRecorder.RecorderError.permissionDenied {
+            errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
+        } catch { errorMessage = "We couldn’t start recording. Please try again." }
     }
 
     private func process(_ url: URL) {

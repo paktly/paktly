@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Environment } from "../../config/environment.js";
 import { requireAuthentication } from "../auth/authentication.js";
 import { OpenAIAssistantProvider, type AssistantDraft, type AssistantProvider } from "./openai-provider.js";
+import { deterministicIntent, deterministicPlanId } from "./deterministic-resolution.js";
 
 const requestSchema = z.object({
   prompt: z.string().trim().min(3).max(1_000),
@@ -47,14 +48,34 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
         environment.assistant!.transcriptionModel
       );
       try {
+        const intentHint = deterministicIntent(parsed.data.prompt);
+        const resolvedPlanId = intentHint === "CREATE_PLAN" ? undefined : deterministicPlanId(
+          parsed.data.prompt,
+          plansById.values(),
+          parsed.data.contextPlanId ?? undefined
+        );
+        const startedAt = performance.now();
         const draft = await provider.interpret({
           prompt: parsed.data.prompt,
           today: new Date().toISOString(),
           user: { id: actor.id, name: actor.displayName },
           plans: [...plansById.values()],
+          intentHint,
+          ...(resolvedPlanId ? { resolvedPlanId } : {}),
           ...(parsed.data.contextPlanId ? { contextPlanId: parsed.data.contextPlanId } : {})
         });
-        return { draft: validateAssistantDraft(draft, plansById, actor.id) };
+        const validated = validateAssistantDraft(
+          intentHint ? { ...draft, intent: intentHint, planId: resolvedPlanId ?? draft.planId } : draft,
+          plansById,
+          actor.id
+        );
+        request.log.info({
+          event: "assistant_interpretation_completed",
+          intent: validated.intent,
+          needsClarification: validated.needsClarification,
+          latencyMs: Math.round(performance.now() - startedAt)
+        }, "Ask Paktly interpretation completed");
+        return { draft: validated };
       } catch (error) {
         request.log.error({ err: error }, "Ask Paktly interpretation failed");
         throw app.httpErrors.serviceUnavailable("Ask Paktly couldn’t interpret that request. Please try again.");

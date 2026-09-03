@@ -41,7 +41,7 @@ const outputSchema = {
 } as const;
 
 export interface AssistantProvider {
-  interpret(input: { prompt: string; today: string; user: unknown; plans: unknown[]; contextPlanId?: string }): Promise<AssistantDraft>;
+  interpret(input: { prompt: string; today: string; user: unknown; plans: unknown[]; contextPlanId?: string; intentHint?: string | null; resolvedPlanId?: string }): Promise<AssistantDraft>;
 }
 
 export class OpenAIAssistantProvider implements AssistantProvider {
@@ -63,7 +63,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     return transcript;
   }
 
-  async interpret(input: { prompt: string; today: string; user: unknown; plans: unknown[]; contextPlanId?: string }) {
+  async interpret(input: { prompt: string; today: string; user: unknown; plans: unknown[]; contextPlanId?: string; intentHint?: string | null; resolvedPlanId?: string }) {
     const response = await this.client.responses.create({
       model: this.model,
       store: false,

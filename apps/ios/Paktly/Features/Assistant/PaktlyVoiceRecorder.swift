@@ -20,28 +20,34 @@ final class PaktlyVoiceRecorder: ObservableObject {
         }
         guard granted else { throw RecorderError.permissionDenied }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .spokenAudio, options: [.duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("paktly-\(UUID().uuidString).m4a")
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC), AVSampleRateKey: 16_000,
-            AVNumberOfChannelsKey: 1, AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-        let recorder = try AVAudioRecorder(url: url, settings: settings)
-        recorder.prepareToRecord()
-        guard recorder.record() else { throw RecorderError.unavailable }
-        self.recorder = recorder; recordingURL = url; duration = 0; isRecording = true
-        automaticallyCompletedURL = nil
-        progressTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled, let self, self.isRecording {
-                try? await Task.sleep(for: .milliseconds(200))
-                guard !Task.isCancelled, self.isRecording else { return }
-                self.duration = self.recorder?.currentTime ?? self.duration
-                if self.duration >= 60 {
-                    self.completeAutomatically()
-                    return
+        do {
+            try session.setCategory(.record, mode: .default)
+            try session.setActive(true)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("paktly-\(UUID().uuidString).m4a")
+            let settings: [String: Any] = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 44_100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            let recorder = try AVAudioRecorder(url: url, settings: settings)
+            guard recorder.prepareToRecord(), recorder.record() else { throw RecorderError.unavailable }
+            self.recorder = recorder; recordingURL = url; duration = 0; isRecording = true
+            automaticallyCompletedURL = nil
+            progressTask = Task { @MainActor [weak self] in
+                while !Task.isCancelled, let self, self.isRecording {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    guard !Task.isCancelled, self.isRecording else { return }
+                    self.duration = self.recorder?.currentTime ?? self.duration
+                    if self.duration >= 60 {
+                        self.completeAutomatically()
+                        return
+                    }
                 }
             }
+        } catch {
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            throw error
         }
     }
 

@@ -26,7 +26,7 @@ struct AskPaktlyView: View {
                             .multilineTextAlignment(.center)
                     }
                     Label(
-                        "Apple Speech provides the live words when available. Your completed recording is sent to Paktly’s AI provider, then removed from this device.",
+                        "Live words are sent for AI interpretation. If live text is unavailable, Paktly securely transcribes the recording, then removes it from this device.",
                         systemImage: "lock.shield"
                     )
                     .font(.caption)
@@ -106,7 +106,7 @@ struct AskPaktlyView: View {
         if isStarting { return "Getting ready…" }
         if isProcessing { return "Understanding…" }
         if recorder.isRecording { return "Listening…" }
-        if draft != nil { return "Ready for your review" }
+        if let draft { return draft.needsClarification ? "One more detail" : "Ready for your review" }
         return "Say it. Paktly sets it up."
     }
 

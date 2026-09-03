@@ -93,11 +93,18 @@ export function validateAssistantDraft(
   plans: Map<string, { id: string; currency: string; members: { id: string }[] }>,
   actorId: string
 ): AssistantDraft {
-  if (draft.needsClarification || draft.intent === "UNSUPPORTED") return draft;
+  if (draft.intent === "UNSUPPORTED") return draft;
   if (draft.intent === "CREATE_PLAN") {
     if (!draft.planName) return clarify(draft, "What would you like to call the plan?");
-    return { ...draft, currency: draft.currency?.toUpperCase() ?? "USD" };
+    return {
+      ...draft,
+      needsClarification: false,
+      clarification: null,
+      planId: null,
+      currency: draft.currency?.toUpperCase() ?? "USD"
+    };
   }
+  if (draft.needsClarification) return draft;
   const plan = draft.planId ? plans.get(draft.planId) : undefined;
   if (!plan) return clarify(draft, "Which plan should I use?");
   if (draft.intent === "INVITE_PERSON") {

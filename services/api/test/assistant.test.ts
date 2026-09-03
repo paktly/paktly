@@ -37,4 +37,25 @@ describe("Ask Paktly draft validation", () => {
     const result = validateAssistantDraft({ ...base, planId: null }, plans, actorId);
     expect(result).toMatchObject({ needsClarification: true, clarification: "Which plan should I use?" });
   });
+
+  it("does not ask for an existing plan when creating a new one", () => {
+    const result = validateAssistantDraft({
+      ...base,
+      intent: "CREATE_PLAN",
+      summary: "Create a New York plan",
+      needsClarification: true,
+      clarification: "Which existing plan should I use?",
+      planId,
+      description: null,
+      amountMinor: null,
+      planName: "New York"
+    }, plans, actorId);
+    expect(result).toMatchObject({
+      intent: "CREATE_PLAN",
+      planName: "New York",
+      planId: null,
+      needsClarification: false,
+      clarification: null
+    });
+  });
 });

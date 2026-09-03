@@ -280,7 +280,10 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
           app.httpErrors.badRequest
         );
         const userId = request.authenticatedUser!.id;
-        await requireMember(app, groupId, userId, true);
+        // Every active member can grow a collaborative plan. The invitation is
+        // still attributable to the actor and protected by membership checks,
+        // duplicate detection, expiry, and recipient acceptance.
+        await requireMember(app, groupId, userId);
         const rawIdentifier = ("identifier" in body ? body.identifier : body.email).trim().toLowerCase();
         let invitationEmail: string;
         let invitedUserId: string | undefined;

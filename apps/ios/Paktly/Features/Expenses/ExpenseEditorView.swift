@@ -10,7 +10,7 @@ struct ExpenseEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Expense") { TextField("What was it?", text: $description); TextField("0.00", text: $amount).keyboardType(.decimalPad); TextField("Currency", text: $expenseCurrency).textInputAutocapitalization(.characters); if expenseCurrency.uppercased() != currency { TextField("1 \(expenseCurrency.uppercased()) equals how many \(currency)?", text: $exchangeRate).keyboardType(.decimalPad); Text("This rate is locked to the expense and will not change later.").font(.caption).foregroundStyle(.secondary) }; Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }; Picker("Paid by", selection: $payer) { ForEach(members) { Text($0.displayName).tag($0.id) } } }
+                Section("Expense") { TextField("What was it?", text: $description); TextField("0.00", text: $amount).keyboardType(.decimalPad); TextField("Currency", text: $expenseCurrency).textInputAutocapitalization(.characters); if expenseCurrency.uppercased() != currency { TextField("1 \(expenseCurrency.uppercased()) equals how many \(currency)?", text: $exchangeRate).keyboardType(.decimalPad); Text("This rate is locked to the expense and will not change later.").font(.caption).foregroundStyle(.secondary) }; Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }; Picker("Paid by", selection: $payer) { ForEach(members) { Text(payerLabel(for: $0)).tag($0.id) } }.pickerStyle(.menu) }
                 Section("Split") {
                     Picker("Method", selection: $method) { ForEach(Method.allCases) { Text($0.title).tag($0) } }
                     ForEach(members) { member in HStack { Toggle(member.displayName, isOn: Binding(get: { selected.contains(member.id) }, set: { if $0 { selected.insert(member.id) } else { selected.remove(member.id) } })); if method != .equal { TextField(unitLabel, text: Binding(get: { values[member.id, default: ""] }, set: { values[member.id] = $0 })).frame(width: 80).keyboardType(.decimalPad).disabled(!selected.contains(member.id)) } } }
@@ -38,8 +38,17 @@ struct ExpenseEditorView: View {
         }
     }
     private func configure() {
-        guard payer.isEmpty else { return }; payer = existing?.paidBy ?? members.first?.id ?? ""; selected = Set(members.map(\.id)); expenseCurrency = existing?.originalCurrency ?? currency
+        if payer.isEmpty {
+            payer = existing?.paidBy ?? model.currentUser?.id ?? members.first?.id ?? ""
+        }
+        if selected.isEmpty {
+            selected = Set(members.map(\.id))
+        }
+        expenseCurrency = existing?.originalCurrency ?? currency
         if let existing { description = existing.description; amount = String(format: "%.2f", Double(existing.originalAmountMinor) / 100); category = existing.category; method = Method(rawValue: existing.splitMethod) ?? .equal }
+    }
+    private func payerLabel(for member: APIGroupMember) -> String {
+        member.id == model.currentUser?.id ? "You" : member.displayName
     }
     private func save() async {
         guard let minorAmount else { return }; saving = true

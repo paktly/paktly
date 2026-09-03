@@ -91,7 +91,11 @@ struct GroupDetailView: View {
                 }
             )
         }
-        .sheet(isPresented: $inviting) { InviteView(groupID: groupID) }
+        .sheet(isPresented: $inviting, onDismiss: {
+            Task { await load() }
+        }) {
+            InviteView(groupID: groupID)
+        }
         .task { await load() }
         .refreshable { await load() }
     }

@@ -52,7 +52,8 @@ suite("expense-sharing MVP end to end", () => {
       const accepted = await app.inject({ method: "POST", url: "/api/v1/invitations/accept", headers: auth(name), payload: { token: invited.json().invitation.token } });
       expect(accepted.statusCode).toBe(200);
     }
-    const daveInvite = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { identifier: "dave@example.com" } });
+    // Ordinary active members can invite people after the plan is created.
+    const daveInvite = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("bob"), payload: { identifier: "dave@example.com" } });
     expect(daveInvite.statusCode).toBe(201);
     const declined = await app.inject({ method: "POST", url: `/api/v1/invitations/${daveInvite.json().invitation.id}/decline`, headers: auth("dave") });
     expect(declined.statusCode).toBe(200);

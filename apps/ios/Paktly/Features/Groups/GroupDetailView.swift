@@ -73,6 +73,7 @@ struct GroupDetailView: View {
                 .padding(.top, 12)
             }
             .scrollIndicators(.hidden)
+            .refreshable { await load() }
         }
         .background(PaktlyColor.background.ignoresSafeArea())
         .navigationTitle(group?.name ?? "Plan")
@@ -110,7 +111,6 @@ struct GroupDetailView: View {
             InviteView(groupID: groupID, canManageJoinLink: ["OWNER", "ADMIN"].contains(group?.role ?? ""))
         }
         .task { await load() }
-        .refreshable { await load() }
     }
 
     private var planTabBar: some View {

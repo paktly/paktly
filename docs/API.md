@@ -57,6 +57,17 @@ Paktly account's verified email. Email addresses do not need to belong to an
 existing account: the recipient receives a seven-day, single-use link at
 `PUBLIC_APP_URL/invite?token=...` and can create a Paktly account before accepting.
 
+## Shareable plan links
+
+Plan owners and admins can create a reusable, revocable join link and short code with
+`POST /api/v1/groups/:groupId/join-links`. Creating a new link rotates any active link.
+Links expire after 1–30 days, have a bounded use count, and only add users as ordinary
+members after they review and confirm the plan.
+
+Authenticated recipients use `POST /api/v1/join-links/preview` and
+`POST /api/v1/join-links/accept` with exactly one of `token` or `code`. Owners/admins
+can revoke the current link with `DELETE /api/v1/groups/:groupId/join-links/current`.
+
 Invitation acceptance is deliberately email-bound. The account accepting the
 token must be signed in with the same normalized email address that received the
 invitation. Acceptance is transactional and creates membership, the member's

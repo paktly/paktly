@@ -11,6 +11,12 @@ struct PresentedInvitation: Identifiable, Equatable {
     var id: String { invitation.id }
 }
 struct PresentedPlan: Identifiable, Equatable { let id: String }
+struct PresentedJoinLink: Identifiable, Equatable {
+    let preview: APIJoinLinkPreview
+    let token: String?
+    let code: String?
+    var id: String { preview.id }
+}
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -22,6 +28,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var presentedInvitation: PresentedInvitation?
     @Published private(set) var invitationError: String?
     @Published private(set) var presentedPlan: PresentedPlan?
+    @Published private(set) var presentedJoinLink: PresentedJoinLink?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -68,6 +75,15 @@ final class AppModel: ObservableObject {
                     invitationError = "This invitation is unavailable or belongs to a different email address."
                 }
             }
+            if let joinToken = PendingJoinLinkStore.load() {
+                do {
+                    let preview = try await client.previewJoinLink(token: joinToken)
+                    presentedJoinLink = PresentedJoinLink(preview: preview, token: joinToken, code: nil)
+                } catch {
+                    PendingJoinLinkStore.clear()
+                    invitationError = "This plan invite link is no longer available."
+                }
+            }
             if let first = self.groups.first, let balanceData = try? await client.balances(groupID: first.id) {
                 dashboardCurrency = first.defaultCurrency
                 let own = balanceData.0.first { $0.userId == currentUser?.id }?.netMinor ?? 0
@@ -78,6 +94,16 @@ final class AppModel: ObservableObject {
     }
 
     func handleIncomingURL(_ url: URL) {
+        let isWebJoin = ["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host == "paktly.io" && url.path == "/join"
+        let isAppJoin = url.scheme?.lowercased() == "paktly" && url.host == "join"
+        if isWebJoin || isAppJoin,
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
+           token.count >= 20 {
+            PendingJoinLinkStore.save(token)
+            if KeychainTokenStore.load() != nil { Task { await refresh() } }
+            return
+        }
         let isWebInvitation = ["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host == "paktly.io" && url.path == "/invite"
         let isAppInvitation = url.scheme?.lowercased() == "paktly" && url.host == "invite"
         guard isWebInvitation || isAppInvitation,
@@ -101,6 +127,25 @@ final class AppModel: ObservableObject {
     }
 
     func dismissPresentedPlan() { presentedPlan = nil }
+
+    func previewJoinCode(_ code: String) async throws {
+        let preview = try await client.previewJoinLink(code: code)
+        presentedJoinLink = PresentedJoinLink(preview: preview, token: nil, code: code)
+    }
+
+    func dismissJoinLink() {
+        presentedJoinLink = nil
+        PendingJoinLinkStore.clear()
+    }
+
+    func acceptPresentedJoinLink() async throws {
+        guard let presentedJoinLink else { return }
+        let groupId = try await client.acceptJoinLink(token: presentedJoinLink.token, code: presentedJoinLink.code)
+        self.presentedJoinLink = nil
+        PendingJoinLinkStore.clear()
+        await refresh()
+        presentedPlan = PresentedPlan(id: groupId)
+    }
 
     private func routeRemoteNotification(_ payload: [String: String]) async {
         if let notificationId = payload["notificationId"] { try? await client.markNotificationRead(id: notificationId) }
@@ -210,5 +255,12 @@ private enum PendingPushStore {
     private static let key = "io.paktly.pending-push"
     static func save(_ payload: [String: String]) { UserDefaults.standard.set(payload, forKey: key) }
     static func load() -> [String: String]? { UserDefaults.standard.dictionary(forKey: key) as? [String: String] }
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+private enum PendingJoinLinkStore {
+    private static let key = "io.paktly.pending-join-link"
+    static func save(_ token: String) { UserDefaults.standard.set(token, forKey: key) }
+    static func load() -> String? { UserDefaults.standard.string(forKey: key) }
     static func clear() { UserDefaults.standard.removeObject(forKey: key) }
 }

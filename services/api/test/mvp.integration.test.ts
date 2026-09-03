@@ -60,6 +60,19 @@ suite("expense-sharing MVP end to end", () => {
     expect(declined.json().invitation.status).toBe("DECLINED");
     const emptyInbox = await app.inject({ method: "GET", url: "/api/v1/invitations", headers: auth("dave") });
     expect(emptyInbox.json().invitations).toHaveLength(0);
+    const memberLinkAttempt = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/join-links`, headers: auth("bob"), payload: {} });
+    expect(memberLinkAttempt.statusCode).toBe(403);
+    const createdLink = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/join-links`, headers: auth("alice"), payload: { expiresInDays: 7, maxUses: 10 } });
+    expect(createdLink.statusCode).toBe(201);
+    const joinLink = createdLink.json<{ joinLink: { url: string; code: string } }>().joinLink;
+    expect(joinLink.url).toContain("/join?token=");
+    expect(joinLink.code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const preview = await app.inject({ method: "POST", url: "/api/v1/join-links/preview", headers: auth("dave"), payload: { code: joinLink.code.toLowerCase() } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json().joinLink.groupName).toBe("Shared summer");
+    const joined = await app.inject({ method: "POST", url: "/api/v1/join-links/accept", headers: auth("dave"), payload: { code: joinLink.code } });
+    expect(joined.statusCode).toBe(200);
+    expect(joined.json()).toEqual({ groupId, status: "ACCEPTED" });
     const futureInvite = await app.inject({ method: "POST", url: `/api/v1/groups/${groupId}/invitations`, headers: auth("alice"), payload: { identifier: "eve@example.com" } });
     expect(futureInvite.statusCode).toBe(201);
     const eveSession = await app.inject({ method: "POST", url: "/api/v1/auth/dev-session", payload: { email: "eve@example.com", displayName: "Eve" } });
@@ -69,7 +82,7 @@ suite("expense-sharing MVP end to end", () => {
     const [reconciled] = await app.db`SELECT count(*)::int count FROM notifications WHERE user_id=${sessions.get("eve")!.id} AND type='INVITATION_RECEIVED'`;
     expect(Number(reconciled?.count)).toBe(1);
     const detail = await app.inject({ method: "GET", url: `/api/v1/groups/${groupId}`, headers: auth("alice") });
-    expect(detail.json().members).toHaveLength(3);
+    expect(detail.json().members).toHaveLength(4);
   });
 
   it("creates every split type, snapshots FX, edits, deletes and replays safely", async () => {

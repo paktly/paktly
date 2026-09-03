@@ -61,6 +61,17 @@ struct MainTabView: View {
         ) { plan in
             NavigationStack { GroupDetailView(groupID: plan.id) }
         }
+        .sheet(
+            item: Binding(
+                get: { model.presentedJoinLink },
+                set: { value in if value == nil { model.dismissJoinLink() } }
+            )
+        ) { link in
+            JoinLinkDecisionView(link: link.preview)
+                .environmentObject(model)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var tabBar: some View {
@@ -113,6 +124,76 @@ struct MainTabView: View {
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 4)
+    }
+}
+
+private struct JoinLinkDecisionView: View {
+    @EnvironmentObject private var model: AppModel
+    let link: APIJoinLinkPreview
+    @State private var working = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 22) {
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(PaktlyColor.forest)
+                    .frame(width: 58, height: 58)
+                    .background(PaktlyColor.mint.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Join \(link.groupName)?")
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .foregroundStyle(PaktlyColor.ink)
+                    Text("Shared by \(link.creatorName) · \(link.memberCount) members")
+                        .font(.subheadline)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                    Text("You’ll join as a member. Joining never gives anyone access to your personal account or wallet.")
+                        .font(.subheadline)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(PaktlyColor.coral)
+                }
+
+                Spacer(minLength: 0)
+                Button {
+                    Task { await join() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if working { ProgressView().tint(PaktlyColor.background) }
+                        Text(working ? "Joining…" : "Join plan")
+                    }
+                }
+                .buttonStyle(PaktlyPrimaryButtonStyle())
+                .disabled(working)
+            }
+            .padding(24)
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .navigationTitle("Plan invitation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Not now") { model.dismissJoinLink() }
+                }
+            }
+        }
+    }
+
+    private func join() async {
+        working = true
+        errorMessage = nil
+        do {
+            try await model.acceptPresentedJoinLink()
+        } catch {
+            errorMessage = "This invite link could not be accepted. Ask the organizer for a new one."
+            working = false
+        }
     }
 }
 

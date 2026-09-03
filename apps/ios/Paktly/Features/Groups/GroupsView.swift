@@ -107,14 +107,22 @@ struct GroupsView: View {
 private struct JoinGroupView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var token = ""
+    @State private var code = ""
     @State private var failed = false
+    @State private var working = false
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Invitation code", text: $token)
-                    .textInputAutocapitalization(.never)
+                Section {
+                    TextField("ABCD-EFGH", text: $code)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Plan code")
+                } footer: {
+                    Text("Enter the code shared by a plan organizer. You’ll review the plan before joining.")
+                }
 
                 if failed { Text("That invitation could not be accepted.").foregroundStyle(.red) }
             }
@@ -122,16 +130,17 @@ private struct JoinGroupView: View {
             .toolbar {
                 Button("Join") {
                     Task {
+                        working = true
                         do {
-                            try await model.client.acceptInvitation(token: token)
-                            await model.refresh()
+                            try await model.previewJoinCode(code)
                             dismiss()
                         } catch {
                             failed = true
+                            working = false
                         }
                     }
                 }
-                    .disabled(token.isEmpty)
+                    .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || working)
             }
         }
     }

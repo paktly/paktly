@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct GroupDetailView: View {
     enum PlanTab: String, CaseIterable, Identifiable {
@@ -73,6 +74,13 @@ struct GroupDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    inviting = true
+                } label: {
+                    Label("Invite", systemImage: "person.badge.plus")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     editing = nil
                     showingExpense = true
                 } label: {
@@ -94,7 +102,7 @@ struct GroupDetailView: View {
         .sheet(isPresented: $inviting, onDismiss: {
             Task { await load() }
         }) {
-            InviteView(groupID: groupID)
+            InviteView(groupID: groupID, canManageJoinLink: ["OWNER", "ADMIN"].contains(group?.role ?? ""))
         }
         .task { await load() }
         .refreshable { await load() }
@@ -500,11 +508,14 @@ private struct InviteView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let groupID: String
+    let canManageJoinLink: Bool
     @State private var identifier = ""
     @State private var developmentToken: String?
     @State private var sending = false
     @State private var errorMessage: String?
     @State private var sentIdentifier: String?
+    @State private var joinLink: APIJoinLink?
+    @State private var creatingLink = false
 
     private var normalizedIdentifier: String {
         identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -570,6 +581,61 @@ private struct InviteView: View {
                     .buttonStyle(PaktlyPrimaryButtonStyle())
                     .disabled(normalizedIdentifier.count < 3 || sending)
 
+                    if canManageJoinLink {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("SHAREABLE PLAN LINK")
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.9)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            Text("Let people join without entering an email. Links expire after seven days and can be replaced or revoked at any time.")
+                                .font(.subheadline)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if let joinLink {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("JOIN CODE").font(.caption2.weight(.bold)).foregroundStyle(PaktlyColor.secondaryInk)
+                                            Text(joinLink.code).font(.title3.monospaced().weight(.bold)).foregroundStyle(PaktlyColor.ink)
+                                        }
+                                        Spacer()
+                                        ShareLink(item: joinLink.url) {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                    }
+                                    Text("Expires \(joinLink.expiresAt, style: .relative) · Up to \(joinLink.maxUses) joins")
+                                        .font(.caption)
+                                        .foregroundStyle(PaktlyColor.secondaryInk)
+                                    HStack {
+                                        Button("Copy link") { UIPasteboard.general.url = joinLink.url }
+                                        Spacer()
+                                        Button("Revoke", role: .destructive) { Task { await revokeJoinLink() } }
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                }
+                                .padding(16)
+                                .background(PaktlyColor.mint.opacity(0.2), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                            } else {
+                                Button {
+                                    Task { await createJoinLink() }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        if creatingLink { ProgressView() }
+                                        Label(creatingLink ? "Creating…" : "Create share link", systemImage: "link")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.large)
+                                .disabled(creatingLink)
+                            }
+                        }
+                    }
+
                     if let developmentToken {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("LOCAL TESTING TOKEN").font(.caption2.weight(.bold)).tracking(0.8)
@@ -608,5 +674,26 @@ private struct InviteView: View {
             errorMessage = "We couldn’t send this invitation. Check the username or email and try again."
         }
         sending = false
+    }
+
+    private func createJoinLink() async {
+        guard !creatingLink else { return }
+        creatingLink = true
+        errorMessage = nil
+        do {
+            joinLink = try await model.client.createJoinLink(groupID: groupID)
+        } catch {
+            errorMessage = "We couldn’t create a share link. Please try again."
+        }
+        creatingLink = false
+    }
+
+    private func revokeJoinLink() async {
+        do {
+            try await model.client.revokeJoinLink(groupID: groupID)
+            joinLink = nil
+        } catch {
+            errorMessage = "We couldn’t revoke this share link. Please try again."
+        }
     }
 }

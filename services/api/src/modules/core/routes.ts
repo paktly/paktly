@@ -11,6 +11,17 @@ import { createFederatedSession, verifyAppleIdentityToken, verifyGoogleIdentityT
 
 const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
 const uuid = z.string().uuid();
+const joinCredential = z.object({
+  token: z.string().trim().min(20).max(200).optional(),
+  code: z.string().trim().min(6).max(20).optional()
+}).refine((value) => Boolean(value.token) !== Boolean(value.code), "Provide either a link token or join code.");
+
+function joinCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(8);
+  const value = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  return `${value.slice(0, 4)}-${value.slice(4)}`;
+}
 
 function parse<T>(schema: ZodType<T>, input: unknown, badRequest: (message: string) => Error): T {
   const result = schema.safeParse(input);
@@ -349,6 +360,55 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         return reply.status(201).send({ invitation: { id: invitationId, email: invitationEmail, status: "PENDING", ...(environment.nodeEnvironment !== "production" ? { token: rawToken } : {}) } });
       });
 
+      authenticated.post("/groups/:groupId/join-links", async (request, reply) => {
+        const { groupId } = parse(z.object({ groupId: uuid }), request.params, app.httpErrors.badRequest);
+        const { expiresInDays, maxUses } = parse(
+          z.object({ expiresInDays: z.number().int().min(1).max(30).default(7), maxUses: z.number().int().min(1).max(500).default(50) }),
+          request.body ?? {},
+          app.httpErrors.badRequest
+        );
+        const actor = request.authenticatedUser!;
+        await requireMember(app, groupId, actor.id, true);
+        const [group] = await app.db`SELECT name FROM groups WHERE id=${groupId} AND status='ACTIVE'`;
+        if (!group) throw app.httpErrors.notFound("Plan not found.");
+        const token = randomBytes(32).toString("base64url");
+        const code = joinCode();
+        const id = randomUUID();
+        const [link] = await app.db.begin(async (tx) => {
+          await tx`UPDATE group_join_links SET status='REVOKED',revoked_at=now() WHERE group_id=${groupId} AND status='ACTIVE'`;
+          const rows = await tx`
+            INSERT INTO group_join_links(id,group_id,created_by,token_hash,code_hash,max_uses,expires_at)
+            VALUES(${id},${groupId},${actor.id},${hashToken(token)},${hashToken(code.replace(/-/g, ""))},${maxUses},now()+(${expiresInDays} * interval '1 day'))
+            RETURNING id,group_id,status,max_uses,use_count,expires_at,created_at
+          `;
+          await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${groupId},${actor.id},'JOIN_LINK_CREATED','JOIN_LINK',${id},${`${actor.displayName} created a plan invite link`})`;
+          return rows;
+        });
+        const url = `${environment.emailAuth?.publicAppUrl ?? "https://paktly.io"}/join?token=${encodeURIComponent(token)}`;
+        return reply.status(201).send({ joinLink: { ...link, groupName: String(group.name), url, code } });
+      });
+
+      authenticated.delete("/groups/:groupId/join-links/current", async (request, reply) => {
+        const { groupId } = parse(z.object({ groupId: uuid }), request.params, app.httpErrors.badRequest);
+        const actor = request.authenticatedUser!;
+        await requireMember(app, groupId, actor.id, true);
+        const links = await app.db`UPDATE group_join_links SET status='REVOKED',revoked_at=now() WHERE group_id=${groupId} AND status='ACTIVE' RETURNING id`;
+        if (links.length) await app.db`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${groupId},${actor.id},'JOIN_LINK_REVOKED','JOIN_LINK',${String(links[0]!.id)},${`${actor.displayName} revoked the plan invite link`})`;
+        return reply.status(204).send();
+      });
+
+      authenticated.post("/join-links/preview", { config: { rateLimit: { max: 20, timeWindow: 60_000 } } }, async (request) => {
+        const credential = parse(joinCredential, request.body, app.httpErrors.badRequest);
+        const link = await findJoinLink(app, credential);
+        if (!link) throw app.httpErrors.gone("This plan invitation is invalid, expired, or full.");
+        return { joinLink: publicJoinLink(link) };
+      });
+
+      authenticated.post("/join-links/accept", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+        const credential = parse(joinCredential, request.body, app.httpErrors.badRequest);
+        return acceptJoinLink(app, credential, request.authenticatedUser!);
+      });
+
       authenticated.get("/invitations", async (request) => {
         const invitations = await app.db`
           SELECT i.id,i.group_id,i.email,i.status,i.expires_at,i.created_at,
@@ -448,5 +508,59 @@ async function acceptInvitation(
     await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${String(invitation.group_id)},${user.id},'MEMBER_JOINED','MEMBER',${user.id},${`${user.displayName} joined ${String(group.name)}`})`;
     await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) SELECT gen_random_uuid(),user_id,${String(invitation.group_id)},'MEMBER_JOINED','A member joined',${`${user.displayName} joined ${String(group.name)}`},'MEMBER',${user.id} FROM group_members WHERE group_id=${String(invitation.group_id)} AND status='ACTIVE' AND user_id<>${user.id}`;
     return { groupId: String(invitation.group_id), status: "ACCEPTED" };
+  });
+}
+
+async function findJoinLink(app: FastifyInstance, credential: { token?: string | undefined; code?: string | undefined }) {
+  const hash = hashToken(credential.token ?? credential.code!.replace(/[^A-Za-z0-9]/g, "").toUpperCase());
+  const column = credential.token ? "token_hash" : "code_hash";
+  const rows = await app.db.unsafe(`
+    SELECT jl.id,jl.group_id,jl.expires_at,jl.max_uses,jl.use_count,g.name group_name,
+      (SELECT count(*)::int FROM group_members gm WHERE gm.group_id=g.id AND gm.status='ACTIVE') member_count,
+      p.display_name creator_name
+    FROM group_join_links jl
+    JOIN groups g ON g.id=jl.group_id
+    JOIN user_profiles p ON p.user_id=jl.created_by
+    WHERE jl.${column}=$1 AND jl.status='ACTIVE' AND jl.expires_at>now()
+      AND jl.use_count<jl.max_uses AND g.status='ACTIVE'
+  `, [hash]);
+  return rows[0];
+}
+
+function publicJoinLink(link: Record<string, unknown>) {
+  return {
+    id: String(link.id),
+    groupId: String(link.group_id),
+    groupName: String(link.group_name),
+    creatorName: String(link.creator_name),
+    memberCount: Number(link.member_count),
+    expiresAt: link.expires_at
+  };
+}
+
+async function acceptJoinLink(
+  app: FastifyInstance,
+  credential: { token?: string | undefined; code?: string | undefined },
+  user: { id: string; displayName: string }
+) {
+  const hash = hashToken(credential.token ?? credential.code!.replace(/[^A-Za-z0-9]/g, "").toUpperCase());
+  const column = credential.token ? "token_hash" : "code_hash";
+  return app.db.begin(async (tx) => {
+    const links = await tx.unsafe(`SELECT * FROM group_join_links WHERE ${column}=$1 FOR UPDATE`, [hash]);
+    const link = links[0];
+    if (!link || link.status !== "ACTIVE" || new Date(String(link.expires_at)) <= new Date() || Number(link.use_count) >= Number(link.max_uses)) {
+      throw app.httpErrors.gone("This plan invitation is invalid, expired, or full.");
+    }
+    const groupId = String(link.group_id);
+    const [existing] = await tx`SELECT status FROM group_members WHERE group_id=${groupId} AND user_id=${user.id}`;
+    if (existing?.status === "ACTIVE") return { groupId, status: "ALREADY_MEMBER" };
+    const [group] = await tx`SELECT name,default_currency FROM groups WHERE id=${groupId} AND status='ACTIVE'`;
+    if (!group) throw app.httpErrors.gone("This plan is no longer available.");
+    await tx`INSERT INTO group_members(group_id,user_id,role) VALUES(${groupId},${user.id},'MEMBER') ON CONFLICT(group_id,user_id) DO UPDATE SET status='ACTIVE',role='MEMBER',joined_at=now()`;
+    await tx`INSERT INTO ledger_accounts(id,group_id,user_id,currency) VALUES(${randomUUID()},${groupId},${user.id},${String(group.default_currency)}) ON CONFLICT DO NOTHING`;
+    await tx`UPDATE group_join_links SET use_count=use_count+1 WHERE id=${String(link.id)}`;
+    await tx`INSERT INTO activity_events(id,group_id,actor_user_id,type,entity_type,entity_id,summary) VALUES(${randomUUID()},${groupId},${user.id},'MEMBER_JOINED','MEMBER',${user.id},${`${user.displayName} joined ${String(group.name)} using an invite link`})`;
+    await tx`INSERT INTO notifications(id,user_id,group_id,type,title,body,entity_type,entity_id) SELECT gen_random_uuid(),user_id,${groupId},'MEMBER_JOINED','A member joined',${`${user.displayName} joined ${String(group.name)}`},'MEMBER',${user.id} FROM group_members WHERE group_id=${groupId} AND status='ACTIVE' AND user_id<>${user.id}`;
+    return { groupId, status: "ACCEPTED" };
   });
 }

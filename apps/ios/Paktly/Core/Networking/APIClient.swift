@@ -35,6 +35,25 @@ struct APIInvitation: Codable, Identifiable, Sendable, Equatable {
     let groupName: String
     let inviterName: String
 }
+struct APIJoinLinkPreview: Codable, Identifiable, Sendable, Equatable {
+    let id: String
+    let groupId: String
+    let groupName: String
+    let creatorName: String
+    let memberCount: Int
+    let expiresAt: Date
+}
+struct APIJoinLink: Codable, Identifiable, Sendable {
+    let id: String
+    let groupId: String
+    let groupName: String
+    let url: URL
+    let code: String
+    let maxUses: Int
+    let useCount: Int
+    let expiresAt: Date
+    let createdAt: Date
+}
 
 struct ExpenseDraft: Codable, Sendable {
     struct Weighted: Codable, Sendable { let userId: String; let value: Int }
@@ -228,6 +247,11 @@ private struct PendingInvitationsResponse: Decodable {
 private struct InvitationDetailResponse: Decodable {
     let invitation: APIInvitation
 }
+private struct CreateJoinLinkRequest: Encodable { let expiresInDays: Int; let maxUses: Int }
+private struct JoinLinkCredentialRequest: Encodable { let token: String?; let code: String? }
+private struct JoinLinkResponse: Decodable { let joinLink: APIJoinLink }
+private struct JoinLinkPreviewResponse: Decodable { let joinLink: APIJoinLinkPreview }
+private struct JoinLinkAcceptanceResponse: Decodable { let groupId: String; let status: String }
 
 private struct InvitationStatusPayload: Decodable { let id: String; let status: String }
 private struct InvitationStatusResponse: Decodable { let invitation: InvitationStatusPayload }
@@ -566,6 +590,40 @@ actor APIClient {
             body: InvitationRequest(identifier: identifier)
         )
         return response.invitation.token
+    }
+
+    func createJoinLink(groupID: String) async throws -> APIJoinLink {
+        let response = try await send(
+            JoinLinkResponse.self,
+            path: "groups/\(groupID)/join-links",
+            method: "POST",
+            body: CreateJoinLinkRequest(expiresInDays: 7, maxUses: 50)
+        )
+        return response.joinLink
+    }
+
+    func revokeJoinLink(groupID: String) async throws {
+        try await sendWithoutResponse(path: "groups/\(groupID)/join-links/current", method: "DELETE")
+    }
+
+    func previewJoinLink(token: String? = nil, code: String? = nil) async throws -> APIJoinLinkPreview {
+        let response = try await send(
+            JoinLinkPreviewResponse.self,
+            path: "join-links/preview",
+            method: "POST",
+            body: JoinLinkCredentialRequest(token: token, code: code)
+        )
+        return response.joinLink
+    }
+
+    func acceptJoinLink(token: String? = nil, code: String? = nil) async throws -> String {
+        let response = try await send(
+            JoinLinkAcceptanceResponse.self,
+            path: "join-links/accept",
+            method: "POST",
+            body: JoinLinkCredentialRequest(token: token, code: code)
+        )
+        return response.groupId
     }
 
     func pendingInvitations() async throws -> [APIInvitation] {

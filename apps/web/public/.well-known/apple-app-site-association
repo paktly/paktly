@@ -7,7 +7,12 @@
           {
             "/": "/invite",
             "?": { "token": "*" },
-            "comment": "Paktly plan invitations"
+            "comment": "Paktly email-bound plan invitations"
+          },
+          {
+            "/": "/join",
+            "?": { "token": "*" },
+            "comment": "Paktly shareable plan links"
           }
         ]
       }

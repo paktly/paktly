@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import sensible from "@fastify/sensible";
 import Fastify, { LogController } from "fastify";
 import type { Environment } from "./config/environment.js";
@@ -31,6 +32,9 @@ export async function createApp(environment: Environment) {
     origin: environment.corsOrigins
   });
   await app.register(sensible);
+  await app.register(multipart, {
+    limits: { files: 1, fields: 0, fileSize: 10 * 1024 * 1024 }
+  });
   await app.register(rateLimit, {
     allowList: (request) =>
       request.url === "/api/v1/health" || request.url === "/api/v1/ready",

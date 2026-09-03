@@ -50,9 +50,9 @@ struct GlobalAddCenterView: View {
                     VStack(spacing: 10) {
                         Button { showingAskPaktly = true } label: {
                             actionRow(
-                                title: "Ask Paktly",
-                                subtitle: "Describe what you want to add in your own words.",
-                                icon: "sparkles",
+                                title: "Speak to Paktly",
+                                subtitle: "Say what happened. Review it, then save.",
+                                icon: "waveform",
                                 tint: PaktlyColor.mint
                             )
                         }

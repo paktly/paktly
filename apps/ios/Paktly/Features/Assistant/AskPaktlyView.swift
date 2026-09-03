@@ -3,171 +3,143 @@ import SwiftUI
 struct AskPaktlyView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var recorder = PaktlyVoiceRecorder()
     let contextPlanID: String?
-
-    @State private var prompt = ""
+    @State private var transcript: String?
     @State private var draft: APIAssistantDraft?
-    @State private var isThinking = false
+    @State private var isProcessing = false
     @State private var isConfirming = false
     @State private var errorMessage: String?
-
-    private let examples = [
-        "Add the $35 taxi I paid to Lisbon",
-        "Invite alex@example.com to Bali",
-        "Create a house renovation plan"
-    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    intro
-                    composer
-                    if let draft { review(draft) } else { suggestions }
+                VStack(spacing: 26) {
+                    voiceStage
+                    if let transcript { heardCard(transcript) }
+                    if let draft { review(draft) }
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.circle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(PaktlyColor.coral)
+                            .font(.footnote).foregroundStyle(PaktlyColor.coral)
+                            .multilineTextAlignment(.center)
                     }
+                    Label(
+                        "Your recording is sent to Paktly’s AI provider for transcription. Paktly removes the local recording after processing.",
+                        systemImage: "lock.shield"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                    .multilineTextAlignment(.leading)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20).padding(.vertical, 24)
             }
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Ask Paktly")
+            .navigationTitle("Speak to Paktly")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") { recorder.cancel(); dismiss() }
                 }
+            }
+            .onChange(of: recorder.automaticallyCompletedURL) { _, url in
+                if let url { process(url) }
             }
         }
     }
 
-    private var intro: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(PaktlyColor.forest)
-                .frame(width: 48, height: 48)
-                .background(PaktlyColor.mint.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Add it naturally")
-                    .font(.system(.title3, design: .rounded, weight: .bold))
-                    .foregroundStyle(PaktlyColor.ink)
-                Text("Describe an expense, a new plan, or someone to invite. You’ll review everything before it’s saved.")
-                    .font(.subheadline)
-                    .foregroundStyle(PaktlyColor.secondaryInk)
+    private var voiceStage: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(recorder.isRecording ? PaktlyColor.coral.opacity(0.16) : PaktlyColor.mint.opacity(0.42))
+                    .frame(width: 150, height: 150)
+                    .scaleEffect(recorder.isRecording ? 1.06 : 1)
+                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: recorder.isRecording)
+                Button { toggleRecording() } label: {
+                    Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 38, weight: .semibold)).foregroundStyle(.white)
+                        .frame(width: 92, height: 92)
+                        .background(recorder.isRecording ? PaktlyColor.coral : PaktlyColor.forest, in: Circle())
+                        .shadow(color: PaktlyColor.forest.opacity(0.18), radius: 18, y: 9)
+                }
+                .buttonStyle(.plain).disabled(isProcessing || isConfirming)
+            }
+            VStack(spacing: 7) {
+                Text(stageTitle)
+                    .font(.system(.title2, design: .rounded, weight: .bold)).foregroundStyle(PaktlyColor.ink)
+                Text(stageSubtitle)
+                    .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                    .multilineTextAlignment(.center).frame(maxWidth: 320)
+            }
+            if recorder.isRecording {
+                Text(recorder.formattedDuration)
+                    .font(.system(.body, design: .monospaced, weight: .semibold))
+                    .foregroundStyle(PaktlyColor.coral)
             }
         }
+        .padding(.top, 8)
     }
 
-    private var composer: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextEditor(text: $prompt)
-                .font(.body)
-                .foregroundStyle(PaktlyColor.ink)
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 108)
-                .padding(12)
-                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(alignment: .topLeading) {
-                    if prompt.isEmpty {
-                        Text("e.g. Add the $48 dinner I paid for everyone in Lisbon")
-                            .font(.body)
-                            .foregroundStyle(PaktlyColor.secondaryInk.opacity(0.65))
-                            .padding(.horizontal, 17)
-                            .padding(.vertical, 20)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(PaktlyColor.secondaryInk.opacity(0.13), lineWidth: 1)
-                }
-
-            Button { interpret() } label: {
-                HStack(spacing: 9) {
-                    if isThinking { ProgressView().tint(.white) }
-                    else { Image(systemName: "arrow.up") }
-                    Text(isThinking ? "Understanding…" : "Continue")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PaktlyPrimaryButtonStyle())
-            .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).count < 3 || isThinking || isConfirming)
-        }
+    private var stageTitle: String {
+        if isProcessing { return "Understanding…" }
+        if recorder.isRecording { return "Listening…" }
+        if draft != nil { return "Ready for your review" }
+        return "Say it. Paktly sets it up."
     }
 
-    private var suggestions: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TRY SAYING")
-                .font(.caption.weight(.bold))
-                .tracking(1.2)
-                .foregroundStyle(PaktlyColor.secondaryInk)
-            ForEach(examples, id: \.self) { example in
-                Button { prompt = example } label: {
-                    HStack {
-                        Text(example).font(.subheadline).foregroundStyle(PaktlyColor.ink)
-                        Spacer()
-                        Image(systemName: "arrow.up.left").font(.caption.weight(.bold))
-                            .foregroundStyle(PaktlyColor.forest)
-                    }
-                    .padding(14)
-                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
+    private var stageSubtitle: String {
+        if isProcessing { return "Turning your recording into a clear action." }
+        if recorder.isRecording { return "Tap stop when you’re finished. Recordings end automatically after one minute." }
+        if draft != nil { return "Nothing changes until you confirm below." }
+        return "Try “Add the $48 dinner I paid for everyone in Lisbon.”"
+    }
+
+    private func heardCard(_ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("I HEARD").font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(PaktlyColor.secondaryInk)
+            Text("“\(value)”").font(.body).foregroundStyle(PaktlyColor.ink)
+            Button("Record again") { reset() }
+                .font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.forest)
         }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(17)
+        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func review(_ value: APIAssistantDraft) -> some View {
         VStack(alignment: .leading, spacing: 15) {
-            Text(value.needsClarification ? "ONE MORE DETAIL" : "REVIEW BEFORE SAVING")
-                .font(.caption.weight(.bold)).tracking(1.2)
-                .foregroundStyle(PaktlyColor.secondaryInk)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Label(value.summary, systemImage: icon(for: value.intent))
-                    .font(.headline)
-                    .foregroundStyle(PaktlyColor.ink)
-
+            Text(value.needsClarification ? "NEEDS MORE DETAIL" : "REVIEW BEFORE SAVING")
+                .font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(PaktlyColor.secondaryInk)
+            VStack(alignment: .leading, spacing: 13) {
+                Label(value.summary, systemImage: icon(for: value.intent)).font(.headline).foregroundStyle(PaktlyColor.ink)
                 if value.intent == "UNSUPPORTED" {
-                    Text("Ask Paktly currently helps with expenses, plans, and invitations.")
-                        .font(.subheadline)
-                        .foregroundStyle(PaktlyColor.secondaryInk)
+                    Text("Speak to Paktly currently helps with expenses, plans, and invitations.")
+                        .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
                 } else if value.needsClarification {
-                    Text(value.clarification ?? "Please add a little more detail above.")
-                        .font(.subheadline)
-                        .foregroundStyle(PaktlyColor.secondaryInk)
+                    Text(value.clarification ?? "Please record again with a little more detail.")
+                        .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                    Button("Record with more detail") { reset() }.buttonStyle(PaktlySecondaryButtonStyle())
                 } else {
                     reviewDetails(value)
                     Button { confirm(value) } label: {
                         HStack {
                             if isConfirming { ProgressView().tint(.white) }
                             Text(isConfirming ? "Saving…" : confirmTitle(for: value.intent))
-                        }
-                        .frame(maxWidth: .infinity)
+                        }.frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(PaktlyPrimaryButtonStyle())
-                    .disabled(isConfirming)
+                    .buttonStyle(PaktlyPrimaryButtonStyle()).disabled(isConfirming)
                 }
             }
-            .padding(17)
-            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(17).background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private func reviewDetails(_ value: APIAssistantDraft) -> some View {
+    @ViewBuilder private func reviewDetails(_ value: APIAssistantDraft) -> some View {
         if let plan = plan(for: value.planId) { detailRow("Plan", plan.name) }
         if let description = value.description { detailRow("Expense", description) }
-        if let amount = value.amountMinor, let currency = value.currency {
-            detailRow("Amount", money(amount, currency: currency))
-        }
-        if value.intent == "CREATE_EXPENSE" {
-            detailRow("Split", "Equally between \(value.participantIds.count) people")
-        }
+        if let amount = value.amountMinor, let currency = value.currency { detailRow("Amount", money(amount, currency: currency)) }
+        if value.intent == "CREATE_EXPENSE" { detailRow("Split", "Equally between \(value.participantIds.count) people") }
         if let name = value.planName { detailRow("Name", name) }
         if let invitee = value.inviteIdentifier { detailRow("Invite", invitee) }
     }
@@ -176,31 +148,43 @@ struct AskPaktlyView: View {
         HStack(alignment: .firstTextBaseline) {
             Text(label).font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
             Spacer(minLength: 20)
-            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
-                .multilineTextAlignment(.trailing)
+            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink).multilineTextAlignment(.trailing)
         }
     }
 
-    private func interpret() {
-        errorMessage = nil
-        draft = nil
-        isThinking = true
-        Task {
-            do {
-                draft = try await model.client.interpretAssistant(
-                    prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
-                    contextPlanId: contextPlanID
-                )
-            } catch {
-                errorMessage = "Paktly couldn’t understand that right now. Please try again."
+    private func toggleRecording() {
+        if recorder.isRecording {
+            guard let url = recorder.stop() else { return }
+            process(url)
+        } else {
+            reset()
+            Task {
+                do { try await recorder.start() }
+                catch PaktlyVoiceRecorder.RecorderError.permissionDenied {
+                    errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
+                } catch { errorMessage = "We couldn’t start recording. Please try again." }
             }
-            isThinking = false
         }
+    }
+
+    private func process(_ url: URL) {
+        isProcessing = true; errorMessage = nil
+        Task {
+            defer { try? FileManager.default.removeItem(at: url); isProcessing = false }
+            do {
+                let text = try await model.client.transcribeAssistant(audioURL: url)
+                transcript = text
+                draft = try await model.client.interpretAssistant(prompt: text, contextPlanId: contextPlanID)
+            } catch { errorMessage = "Paktly couldn’t hear that clearly. Please record again." }
+        }
+    }
+
+    private func reset() {
+        recorder.cancel(); transcript = nil; draft = nil; errorMessage = nil
     }
 
     private func confirm(_ value: APIAssistantDraft) {
-        errorMessage = nil
-        isConfirming = true
+        errorMessage = nil; isConfirming = true
         Task {
             do {
                 switch value.intent {
@@ -209,70 +193,40 @@ struct AskPaktlyView: View {
                     try await model.createGroup(name: name, description: value.planDescription, currency: value.currency ?? "USD")
                 case "INVITE_PERSON":
                     guard let planID = value.planId, let identifier = value.inviteIdentifier else { throw AssistantActionError.invalidDraft }
-                    _ = try await model.client.invite(groupID: planID, identifier: identifier)
-                    await model.refresh()
+                    _ = try await model.client.invite(groupID: planID, identifier: identifier); await model.refresh()
                 case "CREATE_EXPENSE":
-                    guard let planID = value.planId,
-                          let description = value.description,
-                          let amount = value.amountMinor,
-                          let payer = value.payerId,
+                    guard let planID = value.planId, let description = value.description,
+                          let amount = value.amountMinor, let payer = value.payerId,
                           !value.participantIds.isEmpty else { throw AssistantActionError.invalidDraft }
                     let expense = ExpenseDraft(
-                        clientOperationId: UUID().uuidString,
-                        description: description,
-                        category: "Other",
-                        amountMinor: amount,
-                        currency: value.currency ?? "USD",
-                        paidBy: payer,
-                        expenseDate: Date(),
-                        notes: "Added with Ask Paktly",
+                        clientOperationId: UUID().uuidString, description: description, category: "Other",
+                        amountMinor: amount, currency: value.currency ?? "USD", paidBy: payer,
+                        expenseDate: Date(), notes: "Added with Speak to Paktly",
                         split: .init(method: "EQUAL", participantIds: value.participantIds, shares: nil, items: nil)
                     )
                     guard await model.submitExpense(groupID: planID, draft: expense) else { throw AssistantActionError.saveFailed }
                     await model.refresh()
-                default:
-                    throw AssistantActionError.invalidDraft
+                default: throw AssistantActionError.invalidDraft
                 }
                 dismiss()
-            } catch {
-                errorMessage = "We couldn’t save this yet. Review the details and try again."
-            }
+            } catch { errorMessage = "We couldn’t save this yet. Please record it again or use the standard form." }
             isConfirming = false
         }
     }
 
     private func plan(for id: String?) -> APIGroup? {
-        guard let id else { return nil }
-        return model.groups.first { $0.id == id }
+        guard let id else { return nil }; return model.groups.first { $0.id == id }
     }
-
     private func money(_ amount: Int, currency: String) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
+        let formatter = NumberFormatter(); formatter.numberStyle = .currency; formatter.currencyCode = currency
         return formatter.string(from: NSNumber(value: Double(amount) / 100)) ?? "\(currency) \(Double(amount) / 100)"
     }
-
     private func icon(for intent: String) -> String {
-        switch intent {
-        case "CREATE_EXPENSE": "banknote"
-        case "CREATE_PLAN": "square.stack.3d.up.fill"
-        case "INVITE_PERSON": "person.badge.plus"
-        default: "questionmark.bubble"
-        }
+        switch intent { case "CREATE_EXPENSE": "banknote"; case "CREATE_PLAN": "square.stack.3d.up.fill"; case "INVITE_PERSON": "person.badge.plus"; default: "questionmark.bubble" }
     }
-
     private func confirmTitle(for intent: String) -> String {
-        switch intent {
-        case "CREATE_EXPENSE": "Add expense"
-        case "CREATE_PLAN": "Create plan"
-        case "INVITE_PERSON": "Send invitation"
-        default: "Confirm"
-        }
+        switch intent { case "CREATE_EXPENSE": "Add expense"; case "CREATE_PLAN": "Create plan"; case "INVITE_PERSON": "Send invitation"; default: "Confirm" }
     }
 }
 
-private enum AssistantActionError: Error {
-    case invalidDraft
-    case saveFailed
-}
+private enum AssistantActionError: Error { case invalidDraft, saveFailed }

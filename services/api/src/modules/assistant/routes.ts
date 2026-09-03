@@ -41,7 +41,11 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
       if (parsed.data.contextPlanId && !plansById.has(parsed.data.contextPlanId)) {
         throw app.httpErrors.forbidden("The selected plan is unavailable.");
       }
-      const provider = injectedProvider ?? new OpenAIAssistantProvider(environment.assistant!.apiKey, environment.assistant!.model);
+      const provider = injectedProvider ?? new OpenAIAssistantProvider(
+        environment.assistant!.apiKey,
+        environment.assistant!.model,
+        environment.assistant!.transcriptionModel
+      );
       try {
         const draft = await provider.interpret({
           prompt: parsed.data.prompt,
@@ -54,6 +58,29 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
       } catch (error) {
         request.log.error({ err: error }, "Ask Paktly interpretation failed");
         throw app.httpErrors.serviceUnavailable("Ask Paktly couldn’t interpret that request. Please try again.");
+      }
+    });
+
+    app.post("/assistant/transcribe", { config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
+      if (!environment.assistant?.enabled) {
+        throw app.httpErrors.serviceUnavailable("Speak to Paktly is not available right now.");
+      }
+      const part = await request.file();
+      if (!part) throw app.httpErrors.badRequest("An audio recording is required.");
+      const allowedTypes = new Set(["audio/mp4", "audio/m4a", "audio/x-m4a", "audio/mpeg", "audio/wav"]);
+      if (!allowedTypes.has(part.mimetype)) throw app.httpErrors.unsupportedMediaType("This audio format is not supported.");
+      const audio = await part.toBuffer();
+      if (audio.length === 0) throw app.httpErrors.badRequest("The audio recording is empty.");
+      try {
+        const provider = new OpenAIAssistantProvider(
+          environment.assistant.apiKey,
+          environment.assistant.model,
+          environment.assistant.transcriptionModel
+        );
+        return { transcript: await provider.transcribe(audio, "paktly-command.m4a", part.mimetype) };
+      } catch (error) {
+        request.log.error({ err: error }, "Speak to Paktly transcription failed");
+        throw app.httpErrors.serviceUnavailable("Paktly couldn’t hear that clearly. Please try again.");
       }
     });
     await app.after();

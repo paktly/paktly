@@ -44,6 +44,7 @@ const environmentSchema = z.object({
   AI_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   OPENAI_API_KEY: z.string().min(20).optional(),
   OPENAI_MODEL: z.string().min(1).default("gpt-5.4-mini"),
+  OPENAI_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-4o-transcribe"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -97,6 +98,7 @@ export type Environment = {
     enabled: boolean;
     apiKey: string;
     model: string;
+    transcriptionModel: string;
   };
 };
 
@@ -226,7 +228,8 @@ export function loadEnvironment(
     assistant: {
       enabled: parsed.data.AI_ASSISTANT_ENABLED,
       apiKey: parsed.data.OPENAI_API_KEY ?? "disabled",
-      model: parsed.data.OPENAI_MODEL
+      model: parsed.data.OPENAI_MODEL,
+      transcriptionModel: parsed.data.OPENAI_TRANSCRIPTION_MODEL
     }
   };
 }

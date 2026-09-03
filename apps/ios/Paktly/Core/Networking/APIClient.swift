@@ -278,6 +278,7 @@ private struct AssistantInterpretRequest: Encodable {
     let contextPlanId: String?
 }
 private struct AssistantInterpretResponse: Decodable { let draft: APIAssistantDraft }
+private struct AssistantTranscriptionResponse: Decodable { let transcript: String }
 
 private struct PendingInvitationsResponse: Decodable {
     let invitations: [APIInvitation]
@@ -512,6 +513,22 @@ actor APIClient {
             body: AssistantInterpretRequest(prompt: prompt, contextPlanId: contextPlanId)
         )
         return response.draft
+    }
+
+    func transcribeAssistant(audioURL: URL) async throws -> String {
+        let audio = try Data(contentsOf: audioURL)
+        let boundary = "PaktlyBoundary-\(UUID().uuidString)"
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"command.m4a\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/mp4\r\n\r\n".data(using: .utf8)!)
+        body.append(audio)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = makeRequest(path: "assistant/transcribe", method: "POST", body: body, authenticated: true)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let data = try await perform(request)
+        return try decoder.decode(AssistantTranscriptionResponse.self, from: data).transcript
     }
 
     func group(_ id: String) async throws -> (APIGroup, [APIGroupMember]) {

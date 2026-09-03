@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import { z } from "zod";
 
 export const assistantDraftSchema = z.object({
@@ -47,8 +47,20 @@ export interface AssistantProvider {
 export class OpenAIAssistantProvider implements AssistantProvider {
   private readonly client: OpenAI;
 
-  constructor(apiKey: string, private readonly model: string) {
+  constructor(apiKey: string, private readonly model: string, private readonly transcriptionModel = "gpt-4o-transcribe") {
     this.client = new OpenAI({ apiKey });
+  }
+
+  async transcribe(audio: Buffer, filename: string, mimeType: string): Promise<string> {
+    const file = await toFile(audio, filename, { type: mimeType });
+    const result = await this.client.audio.transcriptions.create({
+      file,
+      model: this.transcriptionModel,
+      prompt: "Paktly shared plans and expenses. Preserve names, email addresses, amounts, currencies, and plan names exactly."
+    });
+    const transcript = result.text.trim();
+    if (transcript.length < 2) throw new Error("OPENAI_EMPTY_TRANSCRIPT");
+    return transcript;
   }
 
   async interpret(input: { prompt: string; today: string; user: unknown; plans: unknown[]; contextPlanId?: string }) {

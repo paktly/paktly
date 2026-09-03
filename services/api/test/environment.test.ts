@@ -31,7 +31,8 @@ describe("loadEnvironment", () => {
       assistant: {
         enabled: false,
         apiKey: "disabled",
-        model: "gpt-5.4-mini"
+        model: "gpt-5.4-mini",
+        transcriptionModel: "gpt-4o-transcribe"
       },
       logLevel: "info",
       nodeEnvironment: "development",

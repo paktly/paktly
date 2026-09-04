@@ -27,6 +27,8 @@ targets:
       properties:
         CFBundleDisplayName: Paktly
         NSMicrophoneUsageDescription: Speak to Paktly uses your microphone only while you record a command.
+        NSCameraUsageDescription: Paktly uses your camera to scan receipts you choose to add to a shared plan.
+        NSPhotoLibraryUsageDescription: Paktly lets you select a receipt photo to prepare an expense for your review.
         PaktlyAPIBaseURL: https://api.paktly.io/api/v1
         PaktlyAPNSEnvironment: $(PAKTLY_APNS_ENVIRONMENT)
         SocketFiAPIBaseURL: https://api.socket.fi

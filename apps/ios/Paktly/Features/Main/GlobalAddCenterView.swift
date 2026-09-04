@@ -2,11 +2,13 @@ import SwiftUI
 
 private enum GlobalAddAction: String, Hashable {
     case expense
+    case receipt
     case invite
 
     var title: String {
         switch self {
         case .expense: "Add expense"
+        case .receipt: "Scan receipt"
         case .invite: "Invite people"
         }
     }
@@ -14,6 +16,7 @@ private enum GlobalAddAction: String, Hashable {
     var guidance: String {
         switch self {
         case .expense: "Choose where this expense belongs."
+        case .receipt: "Choose the plan for this receipt."
         case .invite: "Choose the plan you want to grow."
         }
     }
@@ -25,6 +28,7 @@ struct GlobalAddCenterView: View {
     @State private var showingCreatePlan = false
     @State private var showingAskPaktly = false
     @State private var expenseContext: ExpensePlanContext?
+    @State private var receiptContext: ExpensePlanContext?
     @State private var invitePlan: APIGroup?
     @State private var loadingAction: GlobalAddAction?
     @State private var errorMessage: String?
@@ -65,6 +69,16 @@ struct GlobalAddCenterView: View {
                             tint: PaktlyColor.mint,
                             action: .expense
                         )
+
+                        NavigationLink(value: GlobalAddAction.receipt) {
+                            actionRow(
+                                title: "Scan receipt",
+                                subtitle: "Capture a receipt, choose its plan, then review the split.",
+                                icon: "doc.viewfinder",
+                                tint: PaktlyColor.lavender
+                            )
+                        }
+                        .buttonStyle(.plain)
 
                         Button { showingCreatePlan = true } label: {
                             actionRow(
@@ -127,6 +141,17 @@ struct GlobalAddCenterView: View {
                 )
                 .environmentObject(model)
             }
+            .sheet(item: $receiptContext) { context in
+                ReceiptScannerView(
+                    group: context.group,
+                    members: context.members,
+                    completed: {
+                        await model.refresh()
+                        dismiss()
+                    }
+                )
+                .environmentObject(model)
+            }
             .sheet(item: $invitePlan) { group in
                 InviteView(
                     groupID: group.id,
@@ -175,7 +200,8 @@ struct GlobalAddCenterView: View {
         Task {
             do {
                 let detail = try await model.client.group(group.id)
-                expenseContext = ExpensePlanContext(group: detail.0, members: detail.1)
+                let context = ExpensePlanContext(group: detail.0, members: detail.1)
+                if action == .receipt { receiptContext = context } else { expenseContext = context }
             } catch {
                 errorMessage = "We couldn’t open this plan. Please try again."
             }
@@ -225,6 +251,7 @@ private struct GlobalPlanPickerView: View {
     let action: GlobalAddAction
     let completed: () -> Void
     @State private var expenseContext: ExpensePlanContext?
+    @State private var receiptContext: ExpensePlanContext?
     @State private var invitePlan: APIGroup?
     @State private var loadingPlanID: String?
     @State private var errorMessage: String?
@@ -246,7 +273,7 @@ private struct GlobalPlanPickerView: View {
                     ForEach(model.groups) { group in
                         Button { select(group) } label: {
                             HStack(spacing: 14) {
-                                Image(systemName: action == .expense ? "receipt" : "person.2")
+                                Image(systemName: action == .invite ? "person.2" : action == .receipt ? "doc.viewfinder" : "receipt")
                                     .font(.headline)
                                     .foregroundStyle(PaktlyColor.forest)
                                     .frame(width: 44, height: 44)
@@ -300,6 +327,17 @@ private struct GlobalPlanPickerView: View {
             )
             .environmentObject(model)
         }
+        .sheet(item: $receiptContext) { context in
+            ReceiptScannerView(
+                group: context.group,
+                members: context.members,
+                completed: {
+                    await model.refresh()
+                    completed()
+                }
+            )
+            .environmentObject(model)
+        }
         .sheet(item: $invitePlan) { group in
             InviteView(
                 groupID: group.id,
@@ -321,7 +359,8 @@ private struct GlobalPlanPickerView: View {
         Task {
             do {
                 let detail = try await model.client.group(group.id)
-                expenseContext = ExpensePlanContext(group: detail.0, members: detail.1)
+                let context = ExpensePlanContext(group: detail.0, members: detail.1)
+                if action == .receipt { receiptContext = context } else { expenseContext = context }
             } catch {
                 errorMessage = "We couldn’t open this plan. Please try again."
             }

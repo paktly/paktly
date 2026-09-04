@@ -1,16 +1,40 @@
 import SwiftUI
 
+struct ExpensePrefill: Sendable {
+    let description: String
+    let amount: String
+    let currency: String
+    let category: String
+    let date: Date
+    let notes: String?
+}
+
 struct ExpenseEditorView: View {
     enum Method: String, CaseIterable, Identifiable { case equal = "EQUAL", exact = "EXACT", percentage = "PERCENTAGE", shares = "SHARES", itemized = "ITEMIZED"; var id: String { rawValue }; var title: String { rawValue.capitalized } }
     @EnvironmentObject private var model: AppModel; @Environment(\.dismiss) private var dismiss
     let groupID: String; let currency: String; let members: [APIGroupMember]; let existing: APIExpense?; let completed: () async -> Void
     @State private var description = ""; @State private var amount = ""; @State private var category = "Food"; @State private var payer = ""; @State private var method = Method.equal
     @State private var expenseCurrency = ""; @State private var exchangeRate = ""
+    @State private var expenseDate = Date(); @State private var notes = ""
     @State private var selected = Set<String>(); @State private var values: [String: String] = [:]; @State private var saving = false; @State private var errorMessage: String?
+
+    init(groupID: String, currency: String, members: [APIGroupMember], existing: APIExpense?, prefill: ExpensePrefill? = nil, completed: @escaping () async -> Void) {
+        self.groupID = groupID
+        self.currency = currency
+        self.members = members
+        self.existing = existing
+        self.completed = completed
+        _description = State(initialValue: prefill?.description ?? "")
+        _amount = State(initialValue: prefill?.amount ?? "")
+        _category = State(initialValue: prefill?.category ?? "Food")
+        _expenseCurrency = State(initialValue: prefill?.currency ?? "")
+        _expenseDate = State(initialValue: prefill?.date ?? existing?.expenseDate ?? .now)
+        _notes = State(initialValue: prefill?.notes ?? "")
+    }
     var body: some View {
         NavigationStack {
             Form {
-                Section("Expense") { TextField("What was it?", text: $description); TextField("0.00", text: $amount).keyboardType(.decimalPad); TextField("Currency", text: $expenseCurrency).textInputAutocapitalization(.characters); if expenseCurrency.uppercased() != currency { TextField("1 \(expenseCurrency.uppercased()) equals how many \(currency)?", text: $exchangeRate).keyboardType(.decimalPad); Text("This rate is locked to the expense and will not change later.").font(.caption).foregroundStyle(.secondary) }; Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }; Picker("Paid by", selection: $payer) { ForEach(members) { Text(payerLabel(for: $0)).tag($0.id) } }.pickerStyle(.menu) }
+                Section("Expense") { TextField("What was it?", text: $description); TextField("0.00", text: $amount).keyboardType(.decimalPad); TextField("Currency", text: $expenseCurrency).textInputAutocapitalization(.characters); if expenseCurrency.uppercased() != currency { TextField("1 \(expenseCurrency.uppercased()) equals how many \(currency)?", text: $exchangeRate).keyboardType(.decimalPad); Text("This rate is locked to the expense and will not change later.").font(.caption).foregroundStyle(.secondary) }; Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }; DatePicker("Date", selection: $expenseDate, displayedComponents: .date); Picker("Paid by", selection: $payer) { ForEach(members) { Text(payerLabel(for: $0)).tag($0.id) } }.pickerStyle(.menu); TextField("Notes (optional)", text: $notes, axis: .vertical).lineLimit(2...4) }
                 Section("Split") {
                     Picker("Method", selection: $method) { ForEach(Method.allCases) { Text($0.title).tag($0) } }
                     ForEach(members) { member in HStack { Toggle(member.displayName, isOn: Binding(get: { selected.contains(member.id) }, set: { if $0 { selected.insert(member.id) } else { selected.remove(member.id) } })); if method != .equal { TextField(unitLabel, text: Binding(get: { values[member.id, default: ""] }, set: { values[member.id] = $0 })).frame(width: 80).keyboardType(.decimalPad).disabled(!selected.contains(member.id)) } } }
@@ -44,8 +68,8 @@ struct ExpenseEditorView: View {
         if selected.isEmpty {
             selected = Set(members.map(\.id))
         }
-        expenseCurrency = existing?.originalCurrency ?? currency
-        if let existing { description = existing.description; amount = String(format: "%.2f", Double(existing.originalAmountMinor) / 100); category = existing.category; method = Method(rawValue: existing.splitMethod) ?? .equal }
+        if expenseCurrency.isEmpty { expenseCurrency = existing?.originalCurrency ?? currency }
+        if let existing { description = existing.description; amount = String(format: "%.2f", Double(existing.originalAmountMinor) / 100); category = existing.category; method = Method(rawValue: existing.splitMethod) ?? .equal; expenseDate = existing.expenseDate; notes = existing.notes ?? "" }
     }
     private func payerLabel(for member: APIGroupMember) -> String {
         member.id == model.currentUser?.id ? "You" : member.displayName
@@ -65,7 +89,7 @@ struct ExpenseEditorView: View {
         if expenseCurrency.uppercased() != currency, let decimal = Decimal(string: exchangeRate) {
             lockedRate = .init(numerator: NSDecimalNumber(decimal: decimal * 1_000_000).intValue, denominator: 1_000_000, provider: "USER_LOCKED", timestamp: .now)
         }
-        let draft = ExpenseDraft(clientOperationId: UUID().uuidString.lowercased(), description: description, category: category, amountMinor: minorAmount, currency: expenseCurrency.uppercased(), paidBy: payer, expenseDate: existing?.expenseDate ?? .now, notes: nil, split: split, exchangeRate: lockedRate)
+        let draft = ExpenseDraft(clientOperationId: UUID().uuidString.lowercased(), description: description, category: category, amountMinor: minorAmount, currency: expenseCurrency.uppercased(), paidBy: payer, expenseDate: expenseDate, notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes, split: split, exchangeRate: lockedRate)
         do {
             if let existing { try await model.client.updateExpense(id: existing.id, expectedVersion: existing.currentVersion, draft: draft) }
             else if !(await model.submitExpense(groupID: groupID, draft: draft)) { throw APIError.requestFailed(400) }

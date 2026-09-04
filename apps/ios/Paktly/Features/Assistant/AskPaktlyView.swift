@@ -415,8 +415,7 @@ struct AskPaktlyView: View {
     }
 
     private var livePreview: String {
-        let openAI = realtime.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return openAI.isEmpty ? recorder.liveTranscript : openAI
+        realtime.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func confirmationOverrides(for value: APIAssistantDraft) -> APIAssistantOverrides {

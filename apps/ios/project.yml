@@ -27,7 +27,6 @@ targets:
       properties:
         CFBundleDisplayName: Paktly
         NSMicrophoneUsageDescription: Speak to Paktly uses your microphone only while you record a command.
-        NSSpeechRecognitionUsageDescription: Paktly uses speech recognition to show an optional live preview while you speak. The final command is verified separately.
         PaktlyAPIBaseURL: https://api.paktly.io/api/v1
         PaktlyAPNSEnvironment: $(PAKTLY_APNS_ENVIRONMENT)
         SocketFiAPIBaseURL: https://api.socket.fi

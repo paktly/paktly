@@ -13,6 +13,9 @@ const commands = [
   ["Invite alex@example.com to Lisbon", "INVITE_PERSON"],
   ["Bring @maria into the Bali plan", "INVITE_PERSON"],
   ["Add Sam to our New York trip", "INVITE_PERSON"],
+  ["Add $200 I saved to our car plan", null],
+  ["Record my 50 dollar contribution to the holiday fund", null],
+  ["I deposited 100 dollars into our savings", null],
   ["What is the weather tomorrow?", null]
 ] as const;
 

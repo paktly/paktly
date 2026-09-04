@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AssistantDraft } from "../src/modules/assistant/openai-provider.js";
-import { validateAssistantDraft } from "../src/modules/assistant/routes.js";
+import { fallbackAssistantDraft, validateAssistantDraft } from "../src/modules/assistant/routes.js";
 
 const planId = "11111111-1111-4111-8111-111111111111";
 const actorId = "22222222-2222-4222-8222-222222222222";
@@ -24,6 +24,14 @@ const base: AssistantDraft = {
 };
 
 describe("Ask Paktly draft validation", () => {
+  it("does not turn a savings contribution into an expense when interpretation fails", () => {
+    expect(fallbackAssistantDraft("Add $200 I saved to our car plan", null)).toMatchObject({
+      intent: "UNSUPPORTED",
+      needsClarification: false,
+      summary: "Savings contributions by voice are not available yet"
+    });
+  });
+
   it("defaults an expense to the actor, plan currency, and all members", () => {
     expect(validateAssistantDraft(base, plans, actorId)).toMatchObject({
       payerId: actorId, participantIds: [actorId, otherId], currency: "USD",

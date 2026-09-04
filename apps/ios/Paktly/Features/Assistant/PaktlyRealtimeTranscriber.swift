@@ -11,9 +11,16 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
     private var socket: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var model = "gpt-live-transcribe"
+    private var pendingAudio: [Data] = []
+    private var pendingAudioBytes = 0
+    private let maximumPendingAudioBytes = 480_000
 
     func start(client: APIClient) async throws {
-        stop()
+        receiveTask?.cancel()
+        socket?.cancel(with: .normalClosure, reason: nil)
+        receiveTask = nil
+        socket = nil
+        isConnected = false
         let session = try await client.realtimeTranscriptionSession()
         model = session.model
         guard let url = URL(string: "wss://api.openai.com/v1/realtime?intent=transcription") else { throw RealtimeError.unavailable }
@@ -35,11 +42,16 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
 
     nonisolated func append(_ pcm16: Data) {
         Task { @MainActor [weak self] in
-            guard let socket = self?.socket else { return }
-            let event: [String: Any] = ["type": "input_audio_buffer.append", "audio": pcm16.base64EncodedString()]
-            guard let data = try? JSONSerialization.data(withJSONObject: event), let text = String(data: data, encoding: .utf8) else { return }
-            do { try await socket.send(.string(text)) }
-            catch { self?.failureMessage = "The live transcription connection was interrupted." }
+            guard let self else { return }
+            guard let socket, isConnected else {
+                pendingAudio.append(pcm16)
+                pendingAudioBytes += pcm16.count
+                while pendingAudioBytes > maximumPendingAudioBytes, !pendingAudio.isEmpty {
+                    pendingAudioBytes -= pendingAudio.removeFirst().count
+                }
+                return
+            }
+            await send(pcm16, on: socket)
         }
     }
 
@@ -58,6 +70,8 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
         receiveTask?.cancel(); receiveTask = nil
         socket?.cancel(with: .normalClosure, reason: nil); socket = nil
         isConnected = false
+        pendingAudio.removeAll(keepingCapacity: false)
+        pendingAudioBytes = 0
     }
 
     private func receiveLoop(_ task: URLSessionWebSocketTask) async {
@@ -70,7 +84,10 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
             if type == "session.created" || type == "transcription_session.created" {
                 await sendSessionConfiguration(on: task)
             }
-            if type == "session.updated" || type == "transcription_session.updated" { isConnected = true }
+            if type == "session.updated" || type == "transcription_session.updated" {
+                isConnected = true
+                await flushPendingAudio(on: task)
+            }
             if type == "error" {
                 let detail = (event["error"] as? [String: Any])?["message"] as? String
                 failureMessage = detail ?? "OpenAI rejected the live transcription session."
@@ -94,7 +111,7 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
                             "prompt": "Paktly shared plans, savings goals, and expenses. Preserve full wording, names, amounts, currencies, dates, and goal objects.",
                             "keywords": ["Paktly", "savings plan", "save together", "car", "home", "wedding", "vacation", "expense", "split equally"],
                             "languages": ["en"],
-                            "delay": "medium"
+                            "delay": "low"
                         ],
                         "turn_detection": NSNull()
                     ]
@@ -108,5 +125,23 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
         }
         do { try await task.send(.string(text)) }
         catch { failureMessage = "Paktly couldn’t configure live transcription." }
+    }
+
+    private func flushPendingAudio(on task: URLSessionWebSocketTask) async {
+        let chunks = pendingAudio
+        pendingAudio.removeAll(keepingCapacity: true)
+        pendingAudioBytes = 0
+        for chunk in chunks {
+            guard isConnected else { return }
+            await send(chunk, on: task)
+        }
+    }
+
+    private func send(_ pcm16: Data, on task: URLSessionWebSocketTask) async {
+        let event: [String: Any] = ["type": "input_audio_buffer.append", "audio": pcm16.base64EncodedString()]
+        guard let data = try? JSONSerialization.data(withJSONObject: event),
+              let text = String(data: data, encoding: .utf8) else { return }
+        do { try await task.send(.string(text)) }
+        catch { failureMessage = "The live transcription connection was interrupted." }
     }
 }

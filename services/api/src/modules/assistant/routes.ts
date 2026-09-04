@@ -71,7 +71,7 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
           parsed.data.contextPlanId ?? undefined
         );
         const startedAt = performance.now();
-        const draft = await provider.interpret({
+        const providerInput = {
           prompt: parsed.data.prompt,
           today: new Date().toISOString(),
           user: { id: actor.id, name: actor.displayName },
@@ -79,7 +79,19 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
           intentHint,
           ...(resolvedPlanId ? { resolvedPlanId } : {}),
           ...(parsed.data.contextPlanId ? { contextPlanId: parsed.data.contextPlanId } : {})
-        });
+        };
+        let draft: AssistantDraft;
+        try {
+          draft = await provider.interpret(providerInput);
+        } catch (firstError) {
+          request.log.warn({ err: firstError, event: "assistant_interpretation_retry" }, "Retrying Ask Paktly interpretation");
+          try {
+            draft = await provider.interpret(providerInput);
+          } catch (secondError) {
+            request.log.error({ err: secondError, event: "assistant_interpretation_fallback" }, "Ask Paktly interpretation retries failed");
+            draft = fallbackAssistantDraft(parsed.data.prompt, intentHint, resolvedPlanId);
+          }
+        }
         const validated = validateAssistantDraft(
           intentHint ? { ...draft, intent: intentHint, planId: resolvedPlanId ?? draft.planId } : draft,
           plansById,
@@ -134,7 +146,7 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
               model: environment.assistant.realtimeTranscriptionModel,
               prompt: "Paktly shared plans, savings goals, and expenses. Preserve the complete wording, especially names, emails, amounts, dates, and goal objects such as a car, home, wedding, vacation, education, emergency fund, or business.",
               keywords: ["Paktly", "savings plan", "save together", "car", "home", "wedding", "vacation", "expense", "split equally"],
-              languages: ["en"], delay: "medium"
+              languages: ["en"], delay: "low"
             },
             turn_detection: null
           } }
@@ -177,6 +189,44 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
       }
     });
     await app.after();
+  };
+}
+
+export function fallbackAssistantDraft(prompt: string, intent: ReturnType<typeof deterministicIntent>, resolvedPlanId?: string): AssistantDraft {
+  const savingsAction = /\b(save|saved|saving|contribute|contributed|contribution|deposit|deposited|transfer|transferred|settle|settled)\b/i.test(prompt);
+  const fallbackIntent = intent ?? "UNSUPPORTED";
+  const clarification = fallbackIntent === "CREATE_PLAN"
+    ? "What would you like to call the new plan?"
+    : fallbackIntent === "CREATE_EXPENSE"
+      ? "Please say the expense, amount, and plan once more."
+      : fallbackIntent === "INVITE_PERSON"
+        ? "Please say who to invite and which plan to use."
+        : null;
+  return {
+    intent: fallbackIntent,
+    summary: savingsAction
+      ? "Savings contributions by voice are not available yet"
+      : fallbackIntent === "UNSUPPORTED" ? "That voice action is not available yet" : "Paktly needs one more detail",
+    needsClarification: fallbackIntent !== "UNSUPPORTED",
+    clarification,
+    planId: resolvedPlanId ?? null,
+    description: null,
+    amountMinor: null,
+    currency: null,
+    payerId: null,
+    participantIds: [],
+    participantQueries: [],
+    payerQuery: null,
+    splitMethod: "EQUAL",
+    splitValues: [],
+    category: "Other",
+    expenseDate: null,
+    planName: null,
+    planDescription: null,
+    planStartDate: null,
+    planEndDate: null,
+    inviteIdentifier: null,
+    inviteIdentifiers: []
   };
 }
 

@@ -25,6 +25,7 @@ private enum GlobalAddAction: String, Hashable {
 struct GlobalAddCenterView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    let contextPlanID: String?
     @State private var showingCreatePlan = false
     @State private var showingAskPaktly = false
     @State private var expenseContext: ExpensePlanContext?
@@ -34,8 +35,8 @@ struct GlobalAddCenterView: View {
     @State private var errorMessage: String?
 
     private var activePlan: APIGroup? {
-        guard let activePlanId = model.activePlanId else { return nil }
-        return model.groups.first { $0.id == activePlanId }
+        guard let contextPlanID else { return nil }
+        return model.groups.first { $0.id == contextPlanID }
     }
 
     var body: some View {
@@ -63,22 +64,20 @@ struct GlobalAddCenterView: View {
                         .buttonStyle(.plain)
 
                         contextualActionButton(
+                            title: "Scan receipt",
+                            subtitle: "Capture the total, then review the payer and split.",
+                            icon: "doc.viewfinder",
+                            tint: PaktlyColor.lavender,
+                            action: .receipt
+                        )
+
+                        contextualActionButton(
                             title: "Add expense",
                             subtitle: "Record a cost and split it with your people.",
                             icon: "banknote",
                             tint: PaktlyColor.mint,
                             action: .expense
                         )
-
-                        NavigationLink(value: GlobalAddAction.receipt) {
-                            actionRow(
-                                title: "Scan receipt",
-                                subtitle: "Capture a receipt, choose its plan, then review the split.",
-                                icon: "doc.viewfinder",
-                                tint: PaktlyColor.lavender
-                            )
-                        }
-                        .buttonStyle(.plain)
 
                         Button { showingCreatePlan = true } label: {
                             actionRow(
@@ -125,7 +124,7 @@ struct GlobalAddCenterView: View {
                 CreatePlanView(completed: { dismiss() }).environmentObject(model)
             }
             .sheet(isPresented: $showingAskPaktly) {
-                AskPaktlyView(contextPlanID: model.activePlanId, completed: { dismiss() })
+                AskPaktlyView(contextPlanID: contextPlanID, completed: { dismiss() })
                     .environmentObject(model)
             }
             .sheet(item: $expenseContext) { context in

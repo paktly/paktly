@@ -27,6 +27,7 @@ struct MainTabView: View {
     @State private var selection: PaktlyTab = .home
     @State private var showingNotifications = false
     @State private var showingAddCenter = false
+    @State private var addContextPlanID: String?
     @State private var showingBalances = false
 
     var body: some View {
@@ -54,8 +55,10 @@ struct MainTabView: View {
             }
             .environmentObject(model)
         }
-        .sheet(isPresented: $showingAddCenter) {
-            GlobalAddCenterView()
+        .sheet(isPresented: $showingAddCenter, onDismiss: {
+            addContextPlanID = nil
+        }) {
+            GlobalAddCenterView(contextPlanID: addContextPlanID)
                 .environmentObject(model)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
@@ -149,6 +152,7 @@ struct MainTabView: View {
 
     private var addButton: some View {
         Button {
+            addContextPlanID = model.activePlanId
             showingAddCenter = true
         } label: {
             VStack(spacing: 3) {

@@ -17,6 +17,10 @@ struct PresentedJoinLink: Identifiable, Equatable {
     let code: String?
     var id: String { preview.id }
 }
+struct ExpenseMutation: Equatable {
+    let id = UUID()
+    let planID: String
+}
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -31,6 +35,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var presentedJoinLink: PresentedJoinLink?
     @Published private(set) var focusedActivityEntityId: String?
     @Published private(set) var activePlanId: String?
+    @Published private(set) var lastExpenseMutation: ExpenseMutation?
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var pendingSyncCount = 0
     @Published private(set) var youOweMinor = 0
@@ -256,6 +261,7 @@ final class AppModel: ObservableObject {
         catch is URLError { try? await offlineQueue.enqueue(groupID: groupID, draft: draft) }
         catch { state = .failed("The expense could not be saved. Check the split and try again."); return false }
         pendingSyncCount = await offlineQueue.count()
+        lastExpenseMutation = ExpenseMutation(planID: groupID)
         return true
     }
 }

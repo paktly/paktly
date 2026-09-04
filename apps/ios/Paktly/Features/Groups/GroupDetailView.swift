@@ -114,6 +114,11 @@ struct GroupDetailView: View {
         .onDisappear {
             if model.activePlanId == groupID { model.setActivePlan(nil) }
         }
+        .onChange(of: model.lastExpenseMutation) { _, mutation in
+            guard mutation?.planID == groupID else { return }
+            selectedTab = .expenses
+            Task { await load() }
+        }
         .task { await load() }
     }
 

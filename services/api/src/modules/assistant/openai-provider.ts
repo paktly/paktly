@@ -103,6 +103,8 @@ export class OpenAIAssistantProvider implements AssistantProvider {
         "Use the plan currency unless another currency is explicit.",
         "If a required fact is ambiguous or missing, set needsClarification=true and ask one concise question.",
         "CREATE_PLAN needs only a concise planName; put destinations, duration, and other supplied details in planDescription. Dates are optional.",
+        "Treat conversational openings and speech disfluencies as instructions, not content. Remove repeated false starts such as 'let's, let's', and do not include phrases like 'create a', 'make a', or 'let's' in planName or planDescription unless semantically necessary.",
+        "For example, 'let's, let's create a save together plan for a car' should have a concise name such as 'Car Savings' and a description about saving together for a car, with no duplicated filler.",
         "For anything else return UNSUPPORTED."
       ].join(" "),
       input: JSON.stringify(input),

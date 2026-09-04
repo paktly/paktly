@@ -10,10 +10,12 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
     @Published private(set) var failureMessage: String?
     private var socket: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
+    private var model = "gpt-live-transcribe"
 
     func start(client: APIClient) async throws {
         stop()
         let session = try await client.realtimeTranscriptionSession()
+        model = session.model
         guard let url = URL(string: "wss://api.openai.com/v1/realtime?intent=transcription") else { throw RealtimeError.unavailable }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(session.clientSecret)", forHTTPHeaderField: "Authorization")
@@ -65,7 +67,10 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
             switch message { case .string(let value): data = Data(value.utf8); case .data(let value): data = value; @unknown default: continue }
             guard let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let type = event["type"] as? String else { continue }
-            if type == "session.created" || type == "transcription_session.created" { isConnected = true }
+            if type == "session.created" || type == "transcription_session.created" {
+                await sendSessionConfiguration(on: task)
+            }
+            if type == "session.updated" || type == "transcription_session.updated" { isConnected = true }
             if type == "error" {
                 let detail = (event["error"] as? [String: Any])?["message"] as? String
                 failureMessage = detail ?? "OpenAI rejected the live transcription session."
@@ -74,5 +79,34 @@ final class PaktlyRealtimeTranscriber: ObservableObject {
             if type.hasSuffix(".delta"), let delta = event["delta"] as? String { transcript += delta }
             if type.hasSuffix(".completed"), let completed = event["transcript"] as? String, completed.count > transcript.count { transcript = completed }
         }
+    }
+
+    private func sendSessionConfiguration(on task: URLSessionWebSocketTask) async {
+        let event: [String: Any] = [
+            "type": "session.update",
+            "session": [
+                "type": "transcription",
+                "audio": [
+                    "input": [
+                        "format": ["type": "audio/pcm", "rate": 24_000],
+                        "transcription": [
+                            "model": model,
+                            "prompt": "Paktly shared plans, savings goals, and expenses. Preserve full wording, names, amounts, currencies, dates, and goal objects.",
+                            "keywords": ["Paktly", "savings plan", "save together", "car", "home", "wedding", "vacation", "expense", "split equally"],
+                            "languages": ["en"],
+                            "delay": "medium"
+                        ],
+                        "turn_detection": NSNull()
+                    ]
+                ]
+            ]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: event),
+              let text = String(data: data, encoding: .utf8) else {
+            failureMessage = "Paktly couldn’t configure live transcription."
+            return
+        }
+        do { try await task.send(.string(text)) }
+        catch { failureMessage = "Paktly couldn’t configure live transcription." }
     }
 }

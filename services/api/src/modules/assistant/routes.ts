@@ -12,7 +12,16 @@ const requestSchema = z.object({
 });
 const confirmationSchema = z.object({
   token: z.string().min(40).max(30_000),
-  idempotencyKey: z.string().trim().min(8).max(100)
+  idempotencyKey: z.string().trim().min(8).max(100),
+  overrides: z.object({
+    planName: z.string().trim().min(1).max(100).optional(),
+    planDescription: z.string().trim().max(1_000).nullable().optional(),
+    description: z.string().trim().min(1).max(200).optional(),
+    amountMinor: z.number().int().positive().optional(),
+    category: z.enum(["Accommodation", "Flights", "Transportation", "Food", "Drinks", "Activities", "Shopping", "Groceries", "Tickets", "Fuel", "Fees", "Other"]).optional(),
+    expenseDate: z.string().date().optional(),
+    inviteIdentifiers: z.array(z.string().trim().min(1).max(254)).min(1).max(20).optional()
+  }).default({})
 });
 
 export function assistantRoutes(environment: Environment, injectedProvider?: AssistantProvider): FastifyPluginAsync {
@@ -98,9 +107,10 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
       let payload;
       try { payload = verifyDraftToken(body.data.token, actor.id, environment.assistant!.draftSecret); }
       catch { throw app.httpErrors.gone("This action preview expired. Please ask Paktly again."); }
+      const editedDraft = applyConfirmationOverrides(payload.draft, body.data.overrides);
       const rows = await app.db`
         INSERT INTO assistant_action_confirmations(draft_id,user_id,idempotency_key,draft)
-        VALUES(${payload.id},${actor.id},${body.data.idempotencyKey},${app.db.json(payload.draft)})
+        VALUES(${payload.id},${actor.id},${body.data.idempotencyKey},${app.db.json(editedDraft)})
         ON CONFLICT(user_id,idempotency_key) DO UPDATE SET idempotency_key=EXCLUDED.idempotency_key
         RETURNING draft_id,draft,confirmed_at
       `;
@@ -117,9 +127,17 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
         method: "POST",
         headers: { Authorization: `Bearer ${environment.assistant.apiKey}`, "Content-Type": "application/json", "OpenAI-Beta": "realtime=v1" },
         body: JSON.stringify({
-          input_audio_format: "pcm16",
-          input_audio_transcription: { model: environment.assistant.realtimeTranscriptionModel, prompt: "Paktly shared plans, savings goals, and expenses. Preserve the complete wording, especially names, emails, amounts, dates, and goal objects such as a car, home, wedding, vacation, education, emergency fund, or business." },
-          turn_detection: { type: "server_vad", silence_duration_ms: 700 }
+          type: "transcription",
+          audio: { input: {
+            format: { type: "audio/pcm", rate: 24_000 },
+            transcription: {
+              model: environment.assistant.realtimeTranscriptionModel,
+              prompt: "Paktly shared plans, savings goals, and expenses. Preserve the complete wording, especially names, emails, amounts, dates, and goal objects such as a car, home, wedding, vacation, education, emergency fund, or business.",
+              keywords: ["Paktly", "savings plan", "save together", "car", "home", "wedding", "vacation", "expense", "split equally"],
+              languages: ["en"], delay: "medium"
+            },
+            turn_detection: null
+          } }
         }),
         signal: AbortSignal.timeout(10_000)
       });
@@ -160,6 +178,19 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
     });
     await app.after();
   };
+}
+
+function applyConfirmationOverrides(draft: AssistantDraft, overrides: z.infer<typeof confirmationSchema>["overrides"]): AssistantDraft {
+  if (draft.intent === "CREATE_PLAN") {
+    return assistantDraftSchema.parse({ ...draft, planName: overrides.planName ?? draft.planName, planDescription: overrides.planDescription !== undefined ? overrides.planDescription : draft.planDescription });
+  }
+  if (draft.intent === "CREATE_EXPENSE") {
+    return assistantDraftSchema.parse({ ...draft, description: overrides.description ?? draft.description, amountMinor: overrides.amountMinor ?? draft.amountMinor, category: overrides.category ?? draft.category, expenseDate: overrides.expenseDate ?? draft.expenseDate });
+  }
+  if (draft.intent === "INVITE_PERSON" && overrides.inviteIdentifiers) {
+    return assistantDraftSchema.parse({ ...draft, inviteIdentifiers: [...new Set(overrides.inviteIdentifiers)], inviteIdentifier: overrides.inviteIdentifiers[0] });
+  }
+  return draft;
 }
 
 async function consumeUsage(app: Parameters<FastifyPluginAsync>[0], userId: string, column: "interpretations" | "transcription_sessions", dailyLimit: number) {

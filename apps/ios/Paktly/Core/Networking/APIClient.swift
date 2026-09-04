@@ -301,7 +301,11 @@ private struct AssistantInterpretResponse: Decodable {
     let confirmationToken: String
     let expiresAt: Date
 }
-private struct AssistantConfirmRequest: Encodable { let token: String; let idempotencyKey: String }
+struct APIAssistantOverrides: Encodable, Sendable {
+    let planName: String?; let planDescription: String?; let description: String?
+    let amountMinor: Int?; let category: String?; let expenseDate: String?; let inviteIdentifiers: [String]?
+}
+private struct AssistantConfirmRequest: Encodable { let token: String; let idempotencyKey: String; let overrides: APIAssistantOverrides }
 private struct AssistantConfirmResponse: Decodable { let draft: APIAssistantDraft }
 private struct AssistantTranscriptionResponse: Decodable { let transcript: String }
 
@@ -542,12 +546,12 @@ actor APIClient {
         return .init(draft: response.draft, confirmationToken: response.confirmationToken, expiresAt: response.expiresAt)
     }
 
-    func confirmAssistant(token: String, idempotencyKey: String) async throws -> APIAssistantDraft {
+    func confirmAssistant(token: String, idempotencyKey: String, overrides: APIAssistantOverrides) async throws -> APIAssistantDraft {
         let response = try await send(
             AssistantConfirmResponse.self,
             path: "assistant/confirm",
             method: "POST",
-            body: AssistantConfirmRequest(token: token, idempotencyKey: idempotencyKey)
+            body: AssistantConfirmRequest(token: token, idempotencyKey: idempotencyKey, overrides: overrides)
         )
         return response.draft
     }

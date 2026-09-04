@@ -16,6 +16,10 @@ struct AskPaktlyView: View {
     @State private var attemptedAutomaticStart = false
     @State private var errorMessage: String?
     @State private var isRealtimeAvailable = false
+    @State private var editedName = ""
+    @State private var editedDescription = ""
+    @State private var editedAmount = ""
+    @State private var editedInvitees = ""
 
     var body: some View {
         NavigationStack {
@@ -172,12 +176,12 @@ struct AskPaktlyView: View {
 
     @ViewBuilder private func reviewDetails(_ value: APIAssistantDraft) -> some View {
         if let plan = plan(for: value.planId) { detailRow("Plan", plan.name) }
-        if let description = value.description { detailRow("Expense", description) }
-        if let amount = value.amountMinor, let currency = value.currency { detailRow("Amount", money(amount, currency: currency)) }
+        if value.description != nil { editableRow("Expense", text: $editedDescription) }
+        if let currency = value.currency, value.amountMinor != nil { editableRow("Amount (\(currency))", text: $editedAmount, keyboard: .decimalPad) }
         if value.intent == "CREATE_EXPENSE" { detailRow("Split", splitSummary(value)) }
-        if let name = value.planName { detailRow("Name", name) }
-        if let invitees = value.inviteIdentifiers, !invitees.isEmpty { detailRow("Invite", invitees.joined(separator: ", ")) }
-        else if let invitee = value.inviteIdentifier { detailRow("Invite", invitee) }
+        if value.planName != nil { editableRow("Name", text: $editedName) }
+        if value.intent == "CREATE_PLAN" { editableRow("Description", text: $editedDescription) }
+        if value.intent == "INVITE_PERSON" { editableRow("Invite", text: $editedInvitees) }
         if let start = value.planStartDate { detailRow("Starts", start) }
         if let end = value.planEndDate { detailRow("Ends", end) }
     }
@@ -187,6 +191,18 @@ struct AskPaktlyView: View {
             Text(label).font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
             Spacer(minLength: 20)
             Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink).multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func editableRow(_ label: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label.uppercased()).font(.caption2.weight(.bold)).tracking(0.8).foregroundStyle(PaktlyColor.secondaryInk)
+            TextField(label, text: text, axis: .vertical)
+                .keyboardType(keyboard)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PaktlyColor.ink)
+                .padding(.vertical, 10).padding(.horizontal, 12)
+                .background(PaktlyColor.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -238,6 +254,7 @@ struct AskPaktlyView: View {
                 let interpretation = try await model.client.interpretAssistant(prompt: text, contextPlanId: contextPlanID)
                 draft = interpretation.draft
                 confirmationToken = interpretation.confirmationToken
+                populateEditableFields(interpretation.draft)
             } catch {
                 errorMessage = "Paktly couldn’t hear that clearly or turn it into an action. Please record again."
             }
@@ -255,7 +272,11 @@ struct AskPaktlyView: View {
         Task {
             do {
                 guard let confirmationToken else { throw AssistantActionError.invalidDraft }
-                let verified = try await model.client.confirmAssistant(token: confirmationToken, idempotencyKey: confirmationIdempotencyKey)
+                let verified = try await model.client.confirmAssistant(
+                    token: confirmationToken,
+                    idempotencyKey: confirmationIdempotencyKey,
+                    overrides: confirmationOverrides(for: value)
+                )
                 switch verified.intent {
                 case "CREATE_PLAN":
                     guard let name = verified.planName else { throw AssistantActionError.invalidDraft }
@@ -333,6 +354,28 @@ struct AskPaktlyView: View {
         let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .iso8601)
         formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: value)
+    }
+
+    private func populateEditableFields(_ value: APIAssistantDraft) {
+        editedName = value.planName ?? ""
+        editedDescription = value.intent == "CREATE_PLAN" ? (value.planDescription ?? "") : (value.description ?? "")
+        editedAmount = value.amountMinor.map { String(format: "%.2f", Double($0) / 100) } ?? ""
+        editedInvitees = (value.inviteIdentifiers?.isEmpty == false ? value.inviteIdentifiers! : [value.inviteIdentifier].compactMap { $0 }).joined(separator: ", ")
+    }
+
+    private func confirmationOverrides(for value: APIAssistantDraft) -> APIAssistantOverrides {
+        let amount = Decimal(string: editedAmount.replacingOccurrences(of: ",", with: "."))
+            .map { NSDecimalNumber(decimal: $0 * 100).intValue }
+        let invitees = editedInvitees.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return APIAssistantOverrides(
+            planName: value.intent == "CREATE_PLAN" ? editedName : nil,
+            planDescription: value.intent == "CREATE_PLAN" ? editedDescription : nil,
+            description: value.intent == "CREATE_EXPENSE" ? editedDescription : nil,
+            amountMinor: value.intent == "CREATE_EXPENSE" ? amount : nil,
+            category: value.category,
+            expenseDate: value.expenseDate,
+            inviteIdentifiers: value.intent == "INVITE_PERSON" ? invitees : nil
+        )
     }
 }
 

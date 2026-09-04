@@ -269,9 +269,11 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
       authenticated.get("/groups", async (request) => {
         const groups = await app.db`
           SELECT g.id,g.name,g.description,g.default_currency,g.status,g.created_at,gm.role,
-            (SELECT count(*)::int FROM group_members m WHERE m.group_id=g.id AND m.status='ACTIVE') member_count
+            (SELECT count(*)::int FROM group_members m WHERE m.group_id=g.id AND m.status='ACTIVE') member_count,
+            (SELECT max(a.created_at) FROM activity_events a WHERE a.group_id=g.id) last_activity_at
           FROM groups g JOIN group_members gm ON gm.group_id=g.id
-          WHERE gm.user_id=${request.authenticatedUser!.id} AND gm.status='ACTIVE' ORDER BY g.updated_at DESC
+          WHERE gm.user_id=${request.authenticatedUser!.id} AND gm.status='ACTIVE'
+          ORDER BY COALESCE((SELECT max(a.created_at) FROM activity_events a WHERE a.group_id=g.id),g.created_at) DESC,g.created_at DESC
         `;
         return { groups };
       });
@@ -470,6 +472,20 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
         const { groupId } = parse(z.object({ groupId: uuid }), request.params, app.httpErrors.badRequest);
         await requireMember(app, groupId, request.authenticatedUser!.id);
         const events = await app.db`SELECT * FROM activity_events WHERE group_id=${groupId} ORDER BY created_at DESC LIMIT 100`;
+        return { events };
+      });
+
+      authenticated.get("/activity", async (request) => {
+        const events = await app.db`
+          SELECT a.*,g.name group_name
+          FROM activity_events a
+          JOIN groups g ON g.id=a.group_id
+          JOIN group_members gm ON gm.group_id=a.group_id
+          WHERE gm.user_id=${request.authenticatedUser!.id}
+            AND gm.status='ACTIVE'
+          ORDER BY a.created_at DESC
+          LIMIT 100
+        `;
         return { events };
       });
 

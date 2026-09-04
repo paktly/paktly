@@ -14,7 +14,15 @@ struct APIUser: Codable, Identifiable, Sendable {
     let username: String?
     let smartAccount: APISmartAccount?
 }
-struct APIGroup: Codable, Identifiable, Sendable { let id: String; let name: String; let description: String?; let defaultCurrency: String; let role: String?; let memberCount: Int? }
+struct APIGroup: Codable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    let description: String?
+    let defaultCurrency: String
+    let role: String?
+    let memberCount: Int?
+    let lastActivityAt: Date?
+}
 struct APIGroupMember: Codable, Identifiable, Sendable { let id: String; let email: String; let displayName: String; let avatarUrl: String?; let role: String }
 struct APIExpense: Codable, Identifiable, Sendable {
     let id: String; let currentVersion: Int; let description: String; let category: String
@@ -25,6 +33,8 @@ struct APIBalance: Codable, Identifiable, Sendable { let userId: String; let dis
 struct APISuggestedSettlement: Codable, Identifiable, Sendable { let fromUserId: String; let toUserId: String; let amountMinor: Int; var id: String { fromUserId + ":\(toUserId):\(amountMinor)" } }
 struct APIActivity: Codable, Identifiable, Sendable {
     let id: String
+    let groupId: String?
+    let groupName: String?
     let type: String
     let entityType: String?
     let entityId: String?
@@ -666,6 +676,10 @@ actor APIClient {
             path: "groups/\(groupID)/activity"
         )
         return response.events
+    }
+
+    func activityFeed() async throws -> [APIActivity] {
+        return try await send(ActivityResponse.self, path: "activity").events
     }
 
     func notifications() async throws -> ([APINotification], Int) {

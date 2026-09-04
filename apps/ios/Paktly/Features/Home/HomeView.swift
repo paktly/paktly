@@ -10,6 +10,7 @@ struct HomeView: View {
     }
 
     private var netMinor: Int { model.youAreOwedMinor - model.youOweMinor }
+    private var recentPlans: [APIGroup] { Array(model.groups.prefix(3)) }
 
     var body: some View {
         NavigationStack {
@@ -124,40 +125,54 @@ struct HomeView: View {
 
     private var plansSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PaktlySectionHeader(title: "Your plans")
-
-            if let group = model.groups.first {
-                NavigationLink(value: group.id) {
-                    HStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(PaktlyColor.lavender.opacity(0.55))
-                                .frame(width: 62, height: 62)
-                            Image(systemName: "sparkles")
-                                .font(.title2.weight(.medium))
-                                .foregroundStyle(PaktlyColor.forest)
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(group.name)
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(PaktlyColor.ink)
-                                .lineLimit(1)
-                            Text("\(group.memberCount ?? 1) people · \(group.defaultCurrency)")
-                                .font(.subheadline)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
-                            Text("Open plan")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PaktlyColor.forest)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PaktlyColor.secondaryInk.opacity(0.7))
-                    }
-                    .padding(16)
-                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            HStack(alignment: .firstTextBaseline) {
+                PaktlySectionHeader(title: "Recently active")
+                Spacer()
+                if model.groups.count > 3 {
+                    Text("Top 3 of \(model.groups.count)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(PaktlyColor.secondaryInk)
                 }
-                .buttonStyle(.plain)
+            }
+
+            if !recentPlans.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(Array(recentPlans.enumerated()), id: \.element.id) { index, group in
+                        NavigationLink(value: group.id) {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(planTint(index).opacity(0.42))
+                                        .frame(width: 54, height: 54)
+                                    Image(systemName: planIcon(index))
+                                        .font(.title3.weight(.semibold))
+                                        .foregroundStyle(PaktlyColor.forest)
+                                }
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(group.name)
+                                        .font(.headline.weight(.bold))
+                                        .foregroundStyle(PaktlyColor.ink)
+                                        .lineLimit(1)
+                                    Text("\(group.memberCount ?? 1) people · \(group.defaultCurrency)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(PaktlyColor.secondaryInk)
+                                    if let date = group.lastActivityAt {
+                                        Text("Active \(date, style: .relative)")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(PaktlyColor.forest)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(PaktlyColor.secondaryInk.opacity(0.7))
+                            }
+                            .padding(14)
+                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             } else {
                 PaktlyEmptyState(title: "Make your first plan", message: "Bring people, costs, and decisions together in one calm space.", icon: "plus")
             }
@@ -179,10 +194,16 @@ struct HomeView: View {
         default:
             if model.pendingSyncCount > 0 {
                 PaktlyStatusBanner(icon: "arrow.triangle.2.circlepath", title: "\(model.pendingSyncCount) waiting to sync", message: "Saved safely on this device. We’ll retry automatically.", tint: PaktlyColor.lavender)
-            } else {
-                PaktlyStatusBanner(icon: "checkmark.shield.fill", title: "Everything is up to date", message: "Your shared activity has been synced.", tint: PaktlyColor.mint)
             }
         }
+    }
+
+    private func planTint(_ index: Int) -> Color {
+        [PaktlyColor.lavender, PaktlyColor.mint, PaktlyColor.coral.opacity(0.65)][index % 3]
+    }
+
+    private func planIcon(_ index: Int) -> String {
+        ["sparkles", "person.2.fill", "flag.fill"][index % 3]
     }
 
     private func balanceMetric(_ title: String, _ amount: Int, tint: Color) -> some View {

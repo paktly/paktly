@@ -1,8 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct AskPaktlyView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var recorder = PaktlyVoiceRecorder()
     @StateObject private var realtime = PaktlyRealtimeTranscriber()
     let contextPlanID: String?
@@ -21,6 +24,9 @@ struct AskPaktlyView: View {
     @State private var editedAmount = ""
     @State private var editedInvitees = ""
     @State private var isEditingDraft = false
+    @State private var microphoneNeedsSettings = false
+    @State private var isReturningFromSettings = false
+    @State private var realtimeStartTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -61,6 +67,12 @@ struct AskPaktlyView: View {
                 attemptedAutomaticStart = true
                 await startRecording()
             }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, isReturningFromSettings else { return }
+                isReturningFromSettings = false
+                microphoneNeedsSettings = false
+                errorMessage = nil
+            }
         }
     }
 
@@ -75,7 +87,7 @@ struct AskPaktlyView: View {
                 Button { toggleRecording() } label: {
                     Group {
                         if isStarting { ProgressView().tint(.white) }
-                        else { Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill") }
+                        else { Image(systemName: recorder.isRecording ? "stop.fill" : microphoneNeedsSettings ? "gearshape.fill" : "mic.fill") }
                     }
                         .font(.system(size: 38, weight: .semibold)).foregroundStyle(.white)
                         .frame(width: 92, height: 92)
@@ -83,7 +95,7 @@ struct AskPaktlyView: View {
                         .shadow(color: PaktlyColor.forest.opacity(0.18), radius: 18, y: 9)
                 }
                 .buttonStyle(.plain).disabled(isStarting || isProcessing || isConfirming)
-                .accessibilityLabel(recorder.isRecording ? "Stop recording" : "Start recording")
+                .accessibilityLabel(recorder.isRecording ? "Stop recording" : microphoneNeedsSettings ? "Open microphone settings" : "Start recording")
             }
             VStack(spacing: 7) {
                 Text(stageTitle)
@@ -234,6 +246,13 @@ struct AskPaktlyView: View {
             guard let url = recorder.stop() else { return }
             process(url)
         } else {
+            if microphoneNeedsSettings {
+                if let settings = URL(string: UIApplication.openSettingsURLString) {
+                    isReturningFromSettings = true
+                    openURL(settings)
+                }
+                return
+            }
             Task { await startRecording() }
         }
     }
@@ -243,22 +262,27 @@ struct AskPaktlyView: View {
         isStarting = true
         defer { isStarting = false }
         do {
-            do {
-                try await realtime.start(client: model.client)
-                isRealtimeAvailable = true
-            } catch {
-                realtime.stop()
-                isRealtimeAvailable = false
-            }
             let liveTranscriber = realtime
-            if isRealtimeAvailable {
-                try await recorder.start { data in liveTranscriber.append(data) }
-            } else {
-                try await recorder.start()
+            try await recorder.start { data in liveTranscriber.append(data) }
+            realtimeStartTask?.cancel()
+            realtimeStartTask = Task { @MainActor in
+                do {
+                    try await liveTranscriber.start(client: model.client)
+                    guard !Task.isCancelled, recorder.isRecording else {
+                        liveTranscriber.stop()
+                        return
+                    }
+                    isRealtimeAvailable = true
+                } catch {
+                    liveTranscriber.stop()
+                    isRealtimeAvailable = false
+                }
             }
+            microphoneNeedsSettings = false
         }
         catch PaktlyVoiceRecorder.RecorderError.microphonePermissionDenied {
-            errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
+            microphoneNeedsSettings = true
+            errorMessage = "Microphone access is off. Tap the settings button to allow access for Paktly."
         } catch { errorMessage = "We couldn’t start recording. Please try again." }
     }
 
@@ -286,6 +310,7 @@ struct AskPaktlyView: View {
     }
 
     private func reset() {
+        realtimeStartTask?.cancel(); realtimeStartTask = nil
         recorder.cancel(); realtime.stop(); isRealtimeAvailable = false
         transcript = nil; draft = nil; confirmationToken = nil
         confirmationIdempotencyKey = UUID().uuidString; errorMessage = nil

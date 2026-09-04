@@ -39,7 +39,7 @@ final class PaktlyVoiceRecorder: ObservableObject {
 
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("paktly-\(UUID().uuidString).wav")
             let file = try AVAudioFile(forWriting: url, settings: format.settings)
-            let speech = await makeSpeechPreview()
+            let speech = makeSpeechPreviewIfAuthorized()
             input.installTap(onBus: 0, bufferSize: 1_024, format: format) { @Sendable buffer, _ in
                 try? file.write(from: buffer)
                 speech?.append(buffer)
@@ -109,8 +109,9 @@ final class PaktlyVoiceRecorder: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func makeSpeechPreview() async -> SFSpeechAudioBufferRecognitionRequest? {
-        guard await Self.requestSpeechPermission(), let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else { return nil }
+    private func makeSpeechPreviewIfAuthorized() -> SFSpeechAudioBufferRecognitionRequest? {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized,
+              let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else { return nil }
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
@@ -140,15 +141,4 @@ final class PaktlyVoiceRecorder: ObservableObject {
         }
     }
 
-    nonisolated private static func requestSpeechPermission() async -> Bool {
-        switch SFSpeechRecognizer.authorizationStatus() {
-        case .authorized: return true
-        case .denied, .restricted: return false
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
-            }
-        @unknown default: return false
-        }
-    }
 }

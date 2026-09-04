@@ -309,9 +309,9 @@ export function validateAssistantDraft(
     return { ...draft, inviteIdentifier: inviteIdentifiers[0]!, inviteIdentifiers };
   }
   const memberIds = new Set(plan.members.map((member) => member.id));
-  const payerResolution = draft.payerQuery ? resolveMember(draft.payerQuery, plan.members) : undefined;
+  const payerResolution = draft.payerQuery ? resolveMember(draft.payerQuery, plan.members, actorId) : undefined;
   if (draft.payerQuery && !payerResolution) return clarify(draft, `I couldn’t uniquely match “${draft.payerQuery}” to a plan member.`);
-  const queriedParticipants = draft.participantQueries.map((query) => resolveMember(query, plan.members));
+  const queriedParticipants = draft.participantQueries.map((query) => resolveMember(query, plan.members, actorId));
   if (queriedParticipants.some((id) => !id)) return clarify(draft, "I couldn’t uniquely match everyone in that split.");
   const payerId = payerResolution ?? draft.payerId ?? actorId;
   const participantIds = queriedParticipants.length
@@ -319,7 +319,7 @@ export function validateAssistantDraft(
     : draft.participantIds.length ? draft.participantIds : [...memberIds];
   if (!draft.description || !draft.amountMinor) return clarify(draft, "What was the expense and how much did it cost?");
   if (!memberIds.has(payerId) || participantIds.some((id) => !memberIds.has(id))) return clarify(draft, "Who paid, and who should share this expense?");
-  const resolvedSplits = draft.splitValues.map((entry) => ({ ...entry, participantId: resolveMember(entry.participantQuery, plan.members) ?? null }));
+  const resolvedSplits = draft.splitValues.map((entry) => ({ ...entry, participantId: resolveMember(entry.participantQuery, plan.members, actorId) ?? null }));
   if (resolvedSplits.some((entry) => !entry.participantId)) return clarify(draft, "I couldn’t uniquely match everyone in that split.");
   if (draft.splitMethod === "EXACT" && resolvedSplits.reduce((sum, entry) => sum + entry.value, 0) !== draft.amountMinor) return clarify(draft, "The exact split amounts don’t add up to the expense total.");
   if (draft.splitMethod === "PERCENTAGE" && resolvedSplits.reduce((sum, entry) => sum + entry.value, 0) !== 10_000) return clarify(draft, "The split percentages must add up to 100%.");
@@ -327,8 +327,11 @@ export function validateAssistantDraft(
   return { ...draft, payerId, participantIds, splitValues: resolvedSplits, currency: draft.currency?.toUpperCase() ?? plan.currency };
 }
 
-function resolveMember(query: string, members: { id: string; name?: string; username?: string | null; email?: string }[]): string | undefined {
+function resolveMember(query: string, members: { id: string; name?: string; username?: string | null; email?: string }[], actorId: string): string | undefined {
   const target = normalizeIdentity(query);
+  if (["i", "me", "my", "myself", "you", "currentuser"].includes(target) && members.some((member) => member.id === actorId)) {
+    return actorId;
+  }
   const matches = members.filter((member) => [member.name, member.username, member.email]
     .filter((value): value is string => Boolean(value))
     .some((value) => normalizeIdentity(value) === target));
@@ -336,7 +339,7 @@ function resolveMember(query: string, members: { id: string; name?: string; user
 }
 
 function normalizeIdentity(value: string): string {
-  return value.trim().toLowerCase().replace(/^@/, "").replace(/\s+/g, " ");
+  return value.trim().toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/^@/, "").replace(/[^a-z0-9]/g, "");
 }
 
 function clarify(draft: AssistantDraft, question: string): AssistantDraft {

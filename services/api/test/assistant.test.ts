@@ -77,6 +77,25 @@ describe("Ask Paktly draft validation", () => {
     expect(result).toMatchObject({ payerId: actorId, participantIds: [otherId, actorId], needsClarification: false });
   });
 
+  it("matches a spoken spaced payer name to a compact display name", () => {
+    const compactId = "55555555-5555-4555-8555-555555555555";
+    const compactPlans = new Map([[planId, {
+      id: planId,
+      currency: "USD",
+      members: [
+        { id: actorId, name: "Alex Morgan", username: "alex", email: "alex@example.com" },
+        { id: compactId, name: "Tinkerpal", username: "tinkerpal", email: "tinker@example.com" }
+      ]
+    }]]);
+    const result = validateAssistantDraft({ ...base, payerQuery: "Tinker Pal" }, compactPlans, actorId);
+    expect(result).toMatchObject({ payerId: compactId, needsClarification: false });
+  });
+
+  it("resolves self-references and otherwise defaults the payer to the actor", () => {
+    expect(validateAssistantDraft({ ...base, payerQuery: "me" }, plans, actorId)).toMatchObject({ payerId: actorId, needsClarification: false });
+    expect(validateAssistantDraft({ ...base, payerQuery: null, payerId: null }, plans, actorId)).toMatchObject({ payerId: actorId, needsClarification: false });
+  });
+
   it("asks for clarification instead of guessing an unknown member", () => {
     const result = validateAssistantDraft({ ...base, participantQueries: ["Jordan"] }, plans, actorId);
     expect(result.needsClarification).toBe(true);

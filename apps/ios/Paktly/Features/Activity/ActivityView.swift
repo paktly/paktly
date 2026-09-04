@@ -127,9 +127,9 @@ struct ActivityView: View {
                         if let groupID = event.groupId {
                             NavigationLink(value: groupID) { activityRow(event) }
                                 .buttonStyle(.plain)
-                                .id(event.entityId ?? event.id)
+                                .id(event.id)
                         } else {
-                            activityRow(event).id(event.entityId ?? event.id)
+                            activityRow(event).id(event.id)
                         }
                     }
                 }
@@ -178,9 +178,9 @@ struct ActivityView: View {
 
     private func revealFocusedEvent(using proxy: ScrollViewProxy) {
         guard let focused = model.focusedActivityEntityId,
-              events.contains(where: { $0.entityId == focused }) else { return }
+              let event = events.first(where: { $0.entityId == focused }) else { return }
         searchText = ""
-        withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(focused, anchor: .center) }
+        withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(event.id, anchor: .center) }
     }
 
     private func activityIcon(_ type: String) -> String {

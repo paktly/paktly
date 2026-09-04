@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import Combine
 import Foundation
+@preconcurrency import Speech
 
 @MainActor
 final class PaktlyVoiceRecorder: ObservableObject {
@@ -9,6 +10,7 @@ final class PaktlyVoiceRecorder: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var automaticallyCompletedURL: URL?
+    @Published private(set) var liveTranscript = ""
 
     private let audioEngine = AVAudioEngine()
     private var audioFile: AVAudioFile?
@@ -17,6 +19,8 @@ final class PaktlyVoiceRecorder: ObservableObject {
     private var startedAt: ContinuousClock.Instant?
     private var inputTapInstalled = false
     private var audioChunkHandler: (@Sendable (Data) -> Void)?
+    private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var speechTask: SFSpeechRecognitionTask?
 
     var formattedDuration: String { String(format: "%d:%02d", Int(duration) / 60, Int(duration) % 60) }
 
@@ -35,8 +39,10 @@ final class PaktlyVoiceRecorder: ObservableObject {
 
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("paktly-\(UUID().uuidString).wav")
             let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            let speech = await makeSpeechPreview()
             input.installTap(onBus: 0, bufferSize: 1_024, format: format) { @Sendable buffer, _ in
                 try? file.write(from: buffer)
+                speech?.append(buffer)
                 if let data = Self.pcm16Mono24k(buffer: buffer, sourceRate: format.sampleRate) {
                     audioChunkHandler?(data)
                 }
@@ -44,7 +50,9 @@ final class PaktlyVoiceRecorder: ObservableObject {
             inputTapInstalled = true
 
             audioFile = file
+            speechRequest = speech
             recordingURL = url
+            liveTranscript = ""
             duration = 0
             automaticallyCompletedURL = nil
             audioEngine.prepare()
@@ -91,12 +99,26 @@ final class PaktlyVoiceRecorder: ObservableObject {
             inputTapInstalled = false
         }
         audioFile = nil
+        speechRequest?.endAudio(); speechRequest = nil
+        speechTask?.cancel(); speechTask = nil
         isRecording = false
         startedAt = nil
         if discarding, let recordingURL { try? FileManager.default.removeItem(at: recordingURL) }
         if discarding { recordingURL = nil }
         audioChunkHandler = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func makeSpeechPreview() async -> SFSpeechAudioBufferRecognitionRequest? {
+        guard await Self.requestSpeechPermission(), let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else { return nil }
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        speechTask = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, _ in
+            guard let text = result?.bestTranscription.formattedString else { return }
+            Task { @MainActor [weak self] in self?.liveTranscript = text }
+        }
+        return request
     }
 
     nonisolated private static func pcm16Mono24k(buffer: AVAudioPCMBuffer, sourceRate: Double) -> Data? {
@@ -115,6 +137,18 @@ final class PaktlyVoiceRecorder: ObservableObject {
     nonisolated private static func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
+        }
+    }
+
+    nonisolated private static func requestSpeechPermission() async -> Bool {
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .authorized: return true
+        case .denied, .restricted: return false
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
+            }
+        @unknown default: return false
         }
     }
 }

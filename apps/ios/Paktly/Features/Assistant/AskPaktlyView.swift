@@ -20,6 +20,7 @@ struct AskPaktlyView: View {
     @State private var editedDescription = ""
     @State private var editedAmount = ""
     @State private var editedInvitees = ""
+    @State private var isEditingDraft = false
 
     var body: some View {
         NavigationStack {
@@ -103,15 +104,15 @@ struct AskPaktlyView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 330)
             }
-            if recorder.isRecording, !realtime.transcript.isEmpty {
-                Text(realtime.transcript)
+            if recorder.isRecording, !livePreview.isEmpty {
+                Text(livePreview)
                     .font(.body)
                     .foregroundStyle(PaktlyColor.ink)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 330)
                     .padding(15)
                     .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                    .accessibilityLabel("Live transcript: \(realtime.transcript)")
+                    .accessibilityLabel("Live transcript: \(livePreview)")
             }
         }
         .padding(.top, 8)
@@ -149,7 +150,14 @@ struct AskPaktlyView: View {
             Text(value.needsClarification ? "NEEDS MORE DETAIL" : "REVIEW BEFORE SAVING")
                 .font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(PaktlyColor.secondaryInk)
             VStack(alignment: .leading, spacing: 13) {
-                Label(value.summary, systemImage: icon(for: value.intent)).font(.headline).foregroundStyle(PaktlyColor.ink)
+                HStack {
+                    Label(value.summary, systemImage: icon(for: value.intent)).font(.headline).foregroundStyle(PaktlyColor.ink)
+                    Spacer()
+                    if value.intent != "UNSUPPORTED" && !value.needsClarification {
+                        Button(isEditingDraft ? "Done" : "Edit") { withAnimation(.easeInOut(duration: 0.2)) { isEditingDraft.toggle() } }
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.forest)
+                    }
+                }
                 if value.intent == "UNSUPPORTED" {
                     Text("Speak to Paktly currently helps with expenses, plans, and invitations.")
                         .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
@@ -176,12 +184,27 @@ struct AskPaktlyView: View {
 
     @ViewBuilder private func reviewDetails(_ value: APIAssistantDraft) -> some View {
         if let plan = plan(for: value.planId) { detailRow("Plan", plan.name) }
-        if value.description != nil { editableRow("Expense", text: $editedDescription) }
-        if let currency = value.currency, value.amountMinor != nil { editableRow("Amount (\(currency))", text: $editedAmount, keyboard: .decimalPad) }
+        if value.description != nil {
+            if isEditingDraft { editableRow("What was it for?", text: $editedDescription) }
+            else { detailRow("For", editedDescription) }
+        }
+        if let currency = value.currency, value.amountMinor != nil {
+            if isEditingDraft { editableRow("Amount (\(currency))", text: $editedAmount, keyboard: .decimalPad) }
+            else { detailRow("Amount", "\(currency) \(editedAmount)") }
+        }
         if value.intent == "CREATE_EXPENSE" { detailRow("Split", splitSummary(value)) }
-        if value.planName != nil { editableRow("Name", text: $editedName) }
-        if value.intent == "CREATE_PLAN" { editableRow("Description", text: $editedDescription) }
-        if value.intent == "INVITE_PERSON" { editableRow("Invite", text: $editedInvitees) }
+        if value.planName != nil {
+            if isEditingDraft { editableRow("Plan name", text: $editedName) }
+            else { detailRow("Name", editedName) }
+        }
+        if value.intent == "CREATE_PLAN", !editedDescription.isEmpty {
+            if isEditingDraft { editableRow("Description", text: $editedDescription) }
+            else { detailRow("About", editedDescription) }
+        }
+        if value.intent == "INVITE_PERSON" {
+            if isEditingDraft { editableRow("People", text: $editedInvitees) }
+            else { detailRow("Invite", editedInvitees) }
+        }
         if let start = value.planStartDate { detailRow("Starts", start) }
         if let end = value.planEndDate { detailRow("Ends", end) }
     }
@@ -255,6 +278,7 @@ struct AskPaktlyView: View {
                 draft = interpretation.draft
                 confirmationToken = interpretation.confirmationToken
                 populateEditableFields(interpretation.draft)
+                isEditingDraft = false
             } catch {
                 errorMessage = "Paktly couldn’t hear that clearly or turn it into an action. Please record again."
             }
@@ -361,6 +385,11 @@ struct AskPaktlyView: View {
         editedDescription = value.intent == "CREATE_PLAN" ? (value.planDescription ?? "") : (value.description ?? "")
         editedAmount = value.amountMinor.map { String(format: "%.2f", Double($0) / 100) } ?? ""
         editedInvitees = (value.inviteIdentifiers?.isEmpty == false ? value.inviteIdentifiers! : [value.inviteIdentifier].compactMap { $0 }).joined(separator: ", ")
+    }
+
+    private var livePreview: String {
+        let openAI = realtime.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        return openAI.isEmpty ? recorder.liveTranscript : openAI
     }
 
     private func confirmationOverrides(for value: APIAssistantDraft) -> APIAssistantOverrides {

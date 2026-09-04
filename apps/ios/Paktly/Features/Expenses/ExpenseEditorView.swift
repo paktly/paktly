@@ -17,6 +17,8 @@ struct ExpenseEditorView: View {
     @State private var expenseCurrency = ""; @State private var exchangeRate = ""
     @State private var expenseDate = Date(); @State private var notes = ""
     @State private var selected = Set<String>(); @State private var values: [String: String] = [:]; @State private var saving = false; @State private var errorMessage: String?
+    @State private var showingCurrencyPicker = false; @State private var showingConversion = false
+    private let receiptPrefilled: Bool
 
     init(groupID: String, currency: String, members: [APIGroupMember], existing: APIExpense?, prefill: ExpensePrefill? = nil, completed: @escaping () async -> Void) {
         self.groupID = groupID
@@ -24,6 +26,7 @@ struct ExpenseEditorView: View {
         self.members = members
         self.existing = existing
         self.completed = completed
+        self.receiptPrefilled = prefill != nil
         _description = State(initialValue: prefill?.description ?? "")
         _amount = State(initialValue: prefill?.amount ?? "")
         _category = State(initialValue: prefill?.category ?? "Food")
@@ -34,7 +37,32 @@ struct ExpenseEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Expense") { TextField("What was it?", text: $description); TextField("0.00", text: $amount).keyboardType(.decimalPad); TextField("Currency", text: $expenseCurrency).textInputAutocapitalization(.characters); if expenseCurrency.uppercased() != currency { TextField("1 \(expenseCurrency.uppercased()) equals how many \(currency)?", text: $exchangeRate).keyboardType(.decimalPad); Text("This rate is locked to the expense and will not change later.").font(.caption).foregroundStyle(.secondary) }; Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }; DatePicker("Date", selection: $expenseDate, displayedComponents: .date); Picker("Paid by", selection: $payer) { ForEach(members) { Text(payerLabel(for: $0)).tag($0.id) } }.pickerStyle(.menu); TextField("Notes (optional)", text: $notes, axis: .vertical).lineLimit(2...4) }
+                Section("Expense") {
+                    TextField("What was it?", text: $description)
+                    TextField("0.00", text: $amount).keyboardType(.decimalPad)
+                    Button { showingCurrencyPicker = true } label: {
+                        HStack {
+                            Text("Receipt currency").foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(PaktlyCurrencyCatalog.symbol(for: expenseCurrency))  \(expenseCurrency)").foregroundStyle(PaktlyColor.forest)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(PaktlyColor.forest)
+                        }
+                    }
+                    if expenseCurrency.uppercased() != currency {
+                        Button { showingConversion = true } label: {
+                            HStack {
+                                Label("Currency conversion", systemImage: "arrow.left.arrow.right")
+                                Spacer()
+                                Text(exchangeRate.isEmpty ? "Required" : "1 \(expenseCurrency) = \(exchangeRate) \(currency)")
+                                    .foregroundStyle(exchangeRate.isEmpty ? PaktlyColor.coral : PaktlyColor.forest)
+                            }
+                        }
+                    }
+                    Picker("Category", selection: $category) { ForEach(["Accommodation","Flights","Transportation","Food","Drinks","Activities","Shopping","Groceries","Tickets","Fuel","Fees","Other"], id: \.self) { Text($0) } }
+                    DatePicker("Date", selection: $expenseDate, displayedComponents: .date)
+                    Picker("Paid by", selection: $payer) { ForEach(members) { Text(payerLabel(for: $0)).tag($0.id) } }.pickerStyle(.menu)
+                    TextField("Notes (optional)", text: $notes, axis: .vertical).lineLimit(2...4)
+                }
                 Section("Split") {
                     Picker("Method", selection: $method) { ForEach(Method.allCases) { Text($0.title).tag($0) } }
                     ForEach(members) { member in HStack { Toggle(member.displayName, isOn: Binding(get: { selected.contains(member.id) }, set: { if $0 { selected.insert(member.id) } else { selected.remove(member.id) } })); if method != .equal { TextField(unitLabel, text: Binding(get: { values[member.id, default: ""] }, set: { values[member.id] = $0 })).frame(width: 80).keyboardType(.decimalPad).disabled(!selected.contains(member.id)) } } }
@@ -46,6 +74,29 @@ struct ExpenseEditorView: View {
             .navigationTitle(existing == nil ? "Add expense" : "Edit expense")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(!valid || saving) } }
             .onAppear { configure() }
+            .task {
+                guard receiptPrefilled, expenseCurrency.uppercased() != currency else { return }
+                try? await Task.sleep(for: .milliseconds(350))
+                showingConversion = true
+            }
+            .onChange(of: expenseCurrency) { oldValue, newValue in
+                guard !oldValue.isEmpty, newValue.uppercased() != currency else { return }
+                exchangeRate = ""
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    showingConversion = true
+                }
+            }
+            .sheet(isPresented: $showingCurrencyPicker) {
+                CurrencyPicker(selection: $expenseCurrency)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingConversion) {
+                CurrencyConversionView(sourceCurrency: expenseCurrency, planCurrency: currency, amount: amount, rate: $exchangeRate)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     private var unitLabel: String { method == .percentage ? "%" : method == .shares ? "shares" : currency }
@@ -98,4 +149,59 @@ struct ExpenseEditorView: View {
     }
     private func moneyMinor(_ value: String?) -> Int { guard let value, let decimal = Decimal(string: value) else { return 0 }; return NSDecimalNumber(decimal: decimal * 100).intValue }
     private func percentageBasisPoints(_ value: String?) -> Int { guard let value, let decimal = Decimal(string: value) else { return 0 }; return NSDecimalNumber(decimal: decimal * 100).intValue }
+}
+
+private struct CurrencyConversionView: View {
+    @Environment(\.dismiss) private var dismiss
+    let sourceCurrency: String
+    let planCurrency: String
+    let amount: String
+    @Binding var rate: String
+
+    private var convertedAmount: String? {
+        guard let source = Decimal(string: amount), let multiplier = Decimal(string: rate), multiplier > 0 else { return nil }
+        let value = NSDecimalNumber(decimal: source * multiplier)
+        return "\(PaktlyCurrencyCatalog.symbol(for: planCurrency))\(value.stringValue)"
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Convert to the plan currency")
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                    Text("This receipt is in \(sourceCurrency), while the plan uses \(planCurrency). Enter the rate shown by your card or trusted currency source.")
+                        .font(.subheadline)
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("EXCHANGE RATE").font(.caption2.weight(.bold)).tracking(0.9).foregroundStyle(PaktlyColor.secondaryInk)
+                    HStack {
+                        Text("1 \(sourceCurrency) =")
+                        TextField("0.00", text: $rate).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        Text(planCurrency)
+                    }
+                    .padding(15)
+                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16))
+                }
+                if let convertedAmount {
+                    Label("Receipt total will be recorded as approximately \(convertedAmount) in this plan.", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(PaktlyColor.forest)
+                }
+                Text("The rate is locked to this expense and will not change when market rates move later.")
+                    .font(.caption)
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                Spacer()
+                Button("Use this rate") { dismiss() }
+                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                    .disabled((Decimal(string: rate) ?? 0) <= 0)
+            }
+            .padding(20)
+            .background(PaktlyColor.background.ignoresSafeArea())
+            .navigationTitle("Currency conversion")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Not now") { dismiss() } } }
+        }
+    }
 }

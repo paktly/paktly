@@ -1,4 +1,5 @@
 import PhotosUI
+import ImageIO
 import SwiftUI
 import UIKit
 import Vision
@@ -22,7 +23,7 @@ private actor ReceiptOCRService {
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             request.automaticallyDetectsLanguage = true
-            try VNImageRequestHandler(cgImage: cgImage, orientation: .up).perform([request])
+            try VNImageRequestHandler(cgImage: cgImage, orientation: image.visionOrientation).perform([request])
             return (request.results ?? [])
                 .compactMap { $0.topCandidates(1).first?.string.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
@@ -54,18 +55,34 @@ private actor ReceiptOCRService {
 
     private static func total(from lines: [String]) -> String? {
         let preferred = lines.filter { line in
-            let value = line.lowercased()
-            return (value.contains("total") || value.contains("amount due") || value.contains("balance due"))
-                && !value.contains("subtotal")
+            let value = normalizeNumerals(line).lowercased()
+            let totalWords = ["grand total", "amount due", "balance due", "total", "الإجمالي", "الإجمالى", "المجموع", "مجموع", "المبلغ المطلوب", "الصافي"]
+            let excludedWords = ["subtotal", "sub total", "tax", "vat", "change", "الضريبة", "الفرعي", "الباقي"]
+            return totalWords.contains(where: value.contains) && !excludedWords.contains(where: value.contains)
         }
-        let candidates = preferred.isEmpty ? Array(lines.suffix(10)) : preferred
-        for line in candidates.reversed() {
-            let matches = line.matches(of: /(?:\d{1,3}(?:[,.]\d{3})*|\d+)[.,]\d{2}/)
-            if let raw = matches.last.map({ String($0.output) }) {
-                return normalizedAmount(raw)
+        for line in preferred.reversed() {
+            if let amount = monetaryValues(in: line, allowWholeNumbers: true).last { return amount }
+        }
+
+        let currencyMarkers = ["$", "€", "£", "¥", "₦", "₹", "د.إ", "د.ك", "ر.س", "AED", "KWD", "SAR", "USD", "EUR", "GBP"]
+        let fallback = lines.flatMap { line -> [String] in
+            let normalized = normalizeNumerals(line)
+            let hasCurrency = currencyMarkers.contains { normalized.localizedCaseInsensitiveContains($0) }
+            return monetaryValues(in: normalized, allowWholeNumbers: hasCurrency)
+        }
+        return fallback.max { (Decimal(string: $0) ?? 0) < (Decimal(string: $1) ?? 0) }
+    }
+
+    private static func monetaryValues(in line: String, allowWholeNumbers: Bool) -> [String] {
+        let value = normalizeNumerals(line)
+        return value.matches(of: /(?:\d{1,3}(?:[,. ]\d{3})+|\d+)(?:[.,]\d{1,3})?/)
+            .map { String($0.output).replacingOccurrences(of: " ", with: "") }
+            .filter { allowWholeNumbers || $0.contains(".") || $0.contains(",") }
+            .compactMap { raw in
+                let amount = normalizedAmount(raw)
+                guard let decimal = Decimal(string: amount), decimal > 0, decimal < 1_000_000_000 else { return nil }
+                return NSDecimalNumber(decimal: decimal).stringValue
             }
-        }
-        return nil
     }
 
     private static func normalizedAmount(_ raw: String) -> String {
@@ -78,13 +95,33 @@ private actor ReceiptOCRService {
         return raw.replacingOccurrences(of: ",", with: "")
     }
 
+    private static func normalizeNumerals(_ value: String) -> String {
+        let digits: [Character: Character] = [
+            "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+            "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4", "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+            "٫": ".", "٬": ","
+        ]
+        return String(value.map { digits[$0] ?? $0 })
+    }
+
     private static func currency(from text: String) -> String? {
-        let value = text.uppercased()
+        let value = normalizeNumerals(text).uppercased()
+        if value.contains("د.ك") || value.contains("د ك") || value.contains("KWD") || value.contains("دينار كويتي") { return "KWD" }
+        if value.contains("د.إ") || value.contains("د إ") || value.contains("AED") || value.contains("درهم إماراتي") { return "AED" }
+        if value.contains("ر.س") || value.contains("ر س") || value.contains("SAR") || value.contains("ريال سعودي") { return "SAR" }
+        if value.contains("ر.ق") || value.contains("QAR") || value.contains("ريال قطري") { return "QAR" }
+        if value.contains("ر.ع") || value.contains("OMR") || value.contains("ريال عماني") { return "OMR" }
+        if value.contains("د.ب") || value.contains("BHD") || value.contains("دينار بحريني") { return "BHD" }
+        if value.contains("JOD") || value.contains("دينار أردني") { return "JOD" }
+        if value.contains("EGP") || value.contains("جنيه مصري") { return "EGP" }
+        if value.contains("MAD") || value.contains("درهم مغربي") { return "MAD" }
         if value.contains("€") || value.contains(" EUR") { return "EUR" }
         if value.contains("£") || value.contains(" GBP") { return "GBP" }
         if value.contains("¥") || value.contains(" JPY") { return "JPY" }
         if value.contains(" CAD") { return "CAD" }
         if value.contains(" AUD") { return "AUD" }
+        if value.contains("₦") || value.contains(" NGN") { return "NGN" }
+        if value.contains("₹") || value.contains(" INR") { return "INR" }
         if value.contains("$") || value.contains(" USD") { return "USD" }
         return nil
     }
@@ -273,7 +310,7 @@ struct ReceiptScannerView: View {
                 currency: result.currency,
                 category: result.category,
                 date: result.date,
-                notes: "Scanned receipt · Review completed by user"
+                notes: nil
             ))
         } catch {
             errorMessage = "We couldn’t find readable receipt details. Retake it in good light or choose another photo."
@@ -290,6 +327,22 @@ struct ReceiptScannerView: View {
             date: .now,
             notes: "Entered from receipt scan"
         ))
+    }
+}
+
+private extension UIImage {
+    var visionOrientation: CGImagePropertyOrientation {
+        switch imageOrientation {
+        case .up: .up
+        case .upMirrored: .upMirrored
+        case .down: .down
+        case .downMirrored: .downMirrored
+        case .left: .left
+        case .leftMirrored: .leftMirrored
+        case .right: .right
+        case .rightMirrored: .rightMirrored
+        @unknown default: .up
+        }
     }
 }
 

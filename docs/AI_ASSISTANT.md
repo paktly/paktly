@@ -2,7 +2,7 @@
 
 Speak to Paktly converts a short voice command into a reviewable action draft. It supports creating an equal-split expense, creating a plan, and inviting one person.
 
-The iOS app records a short audio command and shows a live transcript while the user speaks. When live text is available, it is sent directly to `POST /api/v1/assistant/interpret`; completed-audio transcription remains a fallback when the device produces no live text. The interpretation endpoint supplies only the transcript plus the current user's accessible plans and active members to OpenAI for a strict structured response. Neither endpoint mutates product data. The user must review and explicitly confirm the draft before Paktly calls its existing typed mutation endpoints. The iOS app never receives an OpenAI API key.
+The iOS app records a short audio command and may show a live preview while the user speaks. Realtime text is never authoritative: after the user stops, Paktly transcribes the completed recording with the higher-accuracy transcription model and sends that result to `POST /api/v1/assistant/interpret`. The interpretation endpoint supplies only the transcript plus the current user's accessible plans and active members to OpenAI for a strict structured response. Neither endpoint mutates product data. The user must review and explicitly confirm the draft before Paktly calls its existing typed mutation endpoints. The iOS app never receives an OpenAI API key.
 
 ## Production configuration
 
@@ -10,7 +10,7 @@ The iOS app records a short audio command and shows a live transcript while the 
 AI_ASSISTANT_ENABLED=true
 OPENAI_API_KEY=YOUR_SERVER_SIDE_OPENAI_API_KEY
 OPENAI_MODEL=gpt-5.4-mini
-OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+OPENAI_TRANSCRIPTION_MODEL=gpt-transcribe
 OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-live-transcribe
 ASSISTANT_DRAFT_SECRET=GENERATE_A_STRONG_RANDOM_SECRET
 ```
@@ -28,4 +28,4 @@ Recordings are capped by the client and upload size is capped by the API. Audio 
 
 # Realtime transcription
 
-Production uses `gpt-live-transcribe` with a server-issued ephemeral credential. Completed-file transcription remains a bounded fallback. Apple Speech is not a source of truth for an action and should be removed after Realtime device validation.
+Production uses `gpt-live-transcribe` with a server-issued ephemeral credential for optional live captions. Completed-file transcription is the authoritative command source because accuracy is more important than caption latency for financial and planning actions. Apple Speech is not used.

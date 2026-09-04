@@ -229,9 +229,11 @@ struct AskPaktlyView: View {
         Task {
             defer { try? FileManager.default.removeItem(at: url); isProcessing = false }
             do {
-                let text: String
-                do { text = try await realtime.finish() }
-                catch { text = try await model.client.transcribeAssistant(audioURL: url) }
+                // Realtime text is intentionally preview-only. A completed-file
+                // transcription is more accurate for names, amounts, and goals,
+                // and is always the source passed to action interpretation.
+                _ = try? await realtime.finish()
+                let text = try await model.client.transcribeAssistant(audioURL: url)
                 transcript = text
                 let interpretation = try await model.client.interpretAssistant(prompt: text, contextPlanId: contextPlanID)
                 draft = interpretation.draft

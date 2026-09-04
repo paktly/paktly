@@ -32,7 +32,7 @@ describe("loadEnvironment", () => {
         enabled: false,
         apiKey: "disabled",
         model: "gpt-5.4-mini",
-        transcriptionModel: "gpt-4o-transcribe",
+        transcriptionModel: "gpt-transcribe",
         realtimeTranscriptionModel: "gpt-live-transcribe",
         draftSecret: "development-only-assistant-draft-secret"
       },

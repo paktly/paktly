@@ -74,7 +74,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     const result = await this.client.audio.transcriptions.create({
       file,
       model: this.transcriptionModel,
-      prompt: "Paktly shared plans and expenses. Preserve names, email addresses, amounts, currencies, and plan names exactly."
+      prompt: "Paktly shared plans, savings goals, and expenses. Transcribe the complete command verbatim. Preserve names, email addresses, amounts, currencies, dates, and goal objects such as a car, home, wedding, vacation, education, emergency fund, or business exactly. Do not summarize or rewrite the speaker."
     });
     const transcript = result.text.trim();
     if (transcript.length < 2) throw new Error("OPENAI_EMPTY_TRANSCRIPT");

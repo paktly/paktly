@@ -44,7 +44,7 @@ const environmentSchema = z.object({
   AI_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   OPENAI_API_KEY: z.string().min(20).optional(),
   OPENAI_MODEL: z.string().min(1).default("gpt-5.4-mini"),
-  OPENAI_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-4o-transcribe"),
+  OPENAI_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-transcribe"),
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-live-transcribe"),
   ASSISTANT_DRAFT_SECRET: z.string().min(32).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")

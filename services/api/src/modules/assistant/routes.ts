@@ -118,7 +118,7 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
         headers: { Authorization: `Bearer ${environment.assistant.apiKey}`, "Content-Type": "application/json", "OpenAI-Beta": "realtime=v1" },
         body: JSON.stringify({
           input_audio_format: "pcm16",
-          input_audio_transcription: { model: environment.assistant.realtimeTranscriptionModel, prompt: "Paktly shared plans and expenses. Preserve names, emails, amounts, currencies, and plan names." },
+          input_audio_transcription: { model: environment.assistant.realtimeTranscriptionModel, prompt: "Paktly shared plans, savings goals, and expenses. Preserve the complete wording, especially names, emails, amounts, dates, and goal objects such as a car, home, wedding, vacation, education, emergency fund, or business." },
           turn_detection: { type: "server_vad", silence_duration_ms: 700 }
         }),
         signal: AbortSignal.timeout(10_000)

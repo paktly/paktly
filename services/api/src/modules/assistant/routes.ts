@@ -115,7 +115,7 @@ export function assistantRoutes(environment: Environment, injectedProvider?: Ass
       const startedAt = performance.now();
       const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${environment.assistant.apiKey}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${environment.assistant.apiKey}`, "Content-Type": "application/json", "OpenAI-Beta": "realtime=v1" },
         body: JSON.stringify({
           input_audio_format: "pcm16",
           input_audio_transcription: { model: environment.assistant.realtimeTranscriptionModel, prompt: "Paktly shared plans and expenses. Preserve names, emails, amounts, currencies, and plan names." },

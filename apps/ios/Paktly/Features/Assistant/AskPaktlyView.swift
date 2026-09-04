@@ -205,6 +205,9 @@ struct AskPaktlyView: View {
             if isEditingDraft { editableRow("Amount (\(currency))", text: $editedAmount, keyboard: .decimalPad) }
             else { detailRow("Amount", "\(currency) \(editedAmount)") }
         }
+        if value.intent == "TRACK_SAVINGS" {
+            detailRow("Tracking", "Saved outside Paktly")
+        }
         if value.intent == "CREATE_EXPENSE" { detailRow("Split", splitSummary(value)) }
         if value.planName != nil {
             if isEditingDraft { editableRow("Plan name", text: $editedName) }
@@ -350,6 +353,16 @@ struct AskPaktlyView: View {
                     )
                     guard await model.submitExpense(groupID: planID, draft: expense) else { throw AssistantActionError.saveFailed }
                     await model.refresh()
+                case "TRACK_SAVINGS":
+                    guard let planID = verified.planId, let amount = verified.amountMinor,
+                          let currency = verified.currency else { throw AssistantActionError.invalidDraft }
+                    try await model.client.trackExternalSavings(
+                        groupID: planID,
+                        amountMinor: amount,
+                        currency: currency,
+                        clientOperationId: confirmationIdempotencyKey
+                    )
+                    await model.refresh()
                 default: throw AssistantActionError.invalidDraft
                 }
                 completed?()
@@ -367,10 +380,10 @@ struct AskPaktlyView: View {
         return formatter.string(from: NSNumber(value: Double(amount) / 100)) ?? "\(currency) \(Double(amount) / 100)"
     }
     private func icon(for intent: String) -> String {
-        switch intent { case "CREATE_EXPENSE": "banknote"; case "CREATE_PLAN": "square.stack.3d.up.fill"; case "INVITE_PERSON": "person.badge.plus"; default: "questionmark.bubble" }
+        switch intent { case "CREATE_EXPENSE": "banknote"; case "CREATE_PLAN": "square.stack.3d.up.fill"; case "INVITE_PERSON": "person.badge.plus"; case "TRACK_SAVINGS": "chart.line.uptrend.xyaxis"; default: "questionmark.bubble" }
     }
     private func confirmTitle(for intent: String) -> String {
-        switch intent { case "CREATE_EXPENSE": "Add expense"; case "CREATE_PLAN": "Create plan"; case "INVITE_PERSON": "Send invitation"; default: "Confirm" }
+        switch intent { case "CREATE_EXPENSE": "Add expense"; case "CREATE_PLAN": "Create plan"; case "INVITE_PERSON": "Send invitation"; case "TRACK_SAVINGS": "Track savings"; default: "Confirm" }
     }
 
     private func splitSummary(_ draft: APIAssistantDraft) -> String {
@@ -426,7 +439,7 @@ struct AskPaktlyView: View {
             planName: value.intent == "CREATE_PLAN" ? editedName : nil,
             planDescription: value.intent == "CREATE_PLAN" ? editedDescription : nil,
             description: value.intent == "CREATE_EXPENSE" ? editedDescription : nil,
-            amountMinor: value.intent == "CREATE_EXPENSE" ? amount : nil,
+            amountMinor: ["CREATE_EXPENSE", "TRACK_SAVINGS"].contains(value.intent) ? amount : nil,
             category: value.category,
             expenseDate: value.expenseDate,
             inviteIdentifiers: value.intent == "INVITE_PERSON" ? invitees : nil

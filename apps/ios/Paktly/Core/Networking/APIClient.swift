@@ -603,6 +603,30 @@ actor APIClient {
         )
     }
 
+    func trackExternalSavings(groupID: String, amountMinor: Int, currency: String, clientOperationId: String) async throws {
+        struct Request: Encodable {
+            let amountMinor: Int
+            let currency: String
+            let note: String?
+            let clientOperationId: String
+        }
+        struct Response: Decodable {
+            struct Contribution: Decodable { let id: String }
+            let contribution: Contribution
+        }
+        _ = try await send(
+            Response.self,
+            path: "groups/\(groupID)/savings-contributions",
+            method: "POST",
+            body: Request(
+                amountMinor: amountMinor,
+                currency: currency,
+                note: "Tracked with Speak to Paktly",
+                clientOperationId: clientOperationId
+            )
+        )
+    }
+
     func updateExpense(id: String, expectedVersion: Int, draft: ExpenseDraft) async throws {
         let body = UpdateExpenseRequest(
             expectedVersion: expectedVersion,

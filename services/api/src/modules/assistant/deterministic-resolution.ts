@@ -1,11 +1,11 @@
-export type IntentHint = "CREATE_PLAN" | "CREATE_EXPENSE" | "INVITE_PERSON" | null;
+export type IntentHint = "CREATE_PLAN" | "CREATE_EXPENSE" | "INVITE_PERSON" | "TRACK_SAVINGS" | null;
 
 export function deterministicIntent(prompt: string): IntentHint {
   const normalized = prompt.toLowerCase().replace(/[^a-z0-9@.$€£¥\s_-]/g, " ").replace(/\s+/g, " ").trim();
   if (/\b(create|start|make|set up|setup)\b.{0,36}\b(plan|trip|group|goal)\b/.test(normalized)) return "CREATE_PLAN";
   if (/\b(create|start|make|set up|setup|add)\b.{0,48}\b(saving|savings)\s+(plan|goal)\b/.test(normalized)) return "CREATE_PLAN";
-  if (/\b(add|set|put)\b.{0,24}(?:[$€£¥]\s*\d|\b\d+(?:[.,]\d{1,2})?\s*(?:usd|eur|gbp|jpy|dollars?|euros?|pounds?)\b).{0,24}\b(?:to|into|as|for)\s+(?:a\s+)?savings?\s+for\b/.test(normalized)) return "CREATE_PLAN";
-  if (/\b(save|saved|saving|contribute|contributed|contribution|deposit|deposited|transfer|transferred|settle|settled)\b/.test(normalized)) return null;
+  if (hasMoney(normalized) && /\b(save|saved|saving|savings|contribute|contributed|contribution|deposit|deposited)\b/.test(normalized)) return "TRACK_SAVINGS";
+  if (/\b(transfer|transferred|settle|settled)\b/.test(normalized)) return null;
   if (/\b(invite|bring|add)\b.{0,60}(@|\bto\b.{0,30}\b(plan|trip|group)\b)/.test(normalized) && !hasMoney(normalized)) return "INVITE_PERSON";
   if (hasMoney(normalized) || /\b(paid|spent|cost|expense|dinner|lunch|breakfast|taxi|uber|hotel|tickets?)\b/.test(normalized)) return "CREATE_EXPENSE";
   return null;
@@ -23,7 +23,7 @@ export function deterministicPlanId(
 }
 
 function hasMoney(value: string): boolean {
-  return /(?:[$€£¥]\s*\d|\b\d+(?:[.,]\d{1,2})?\s*(?:usd|eur|gbp|jpy|dollars?|euros?|pounds?)\b)/.test(value);
+  return /(?:[$€£¥]\s*\d|\b\d+(?:[.,]\d{1,2})?\s*(?:usd|eur|gbp|jpy|dollars?|euros?|pounds?)\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)(?:[ -](?:and[ -])?(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million))*\s+(?:dollars?|euros?|pounds?)\b)/.test(value);
 }
 
 function normalize(value: string): string {

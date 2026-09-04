@@ -25,10 +25,29 @@ const base: AssistantDraft = {
 
 describe("Ask Paktly draft validation", () => {
   it("does not turn a savings contribution into an expense when interpretation fails", () => {
-    expect(fallbackAssistantDraft("Add $200 I saved to our car plan", null)).toMatchObject({
-      intent: "UNSUPPORTED",
-      needsClarification: false,
-      summary: "Savings contributions by voice are not available yet"
+    expect(fallbackAssistantDraft("Add $200 I saved to our car plan", "TRACK_SAVINGS", planId)).toMatchObject({
+      intent: "TRACK_SAVINGS",
+      needsClarification: true,
+      summary: "Track savings outside Paktly"
+    });
+  });
+
+  it("validates tracked savings without affecting expense participants", () => {
+    const result = validateAssistantDraft({
+      ...base,
+      intent: "TRACK_SAVINGS",
+      summary: "Track $200 saved outside Paktly",
+      amountMinor: 20_000,
+      description: null,
+      participantIds: []
+    }, plans, actorId);
+    expect(result).toMatchObject({
+      intent: "TRACK_SAVINGS",
+      amountMinor: 20_000,
+      currency: "USD",
+      payerId: actorId,
+      participantIds: [],
+      needsClarification: false
     });
   });
 

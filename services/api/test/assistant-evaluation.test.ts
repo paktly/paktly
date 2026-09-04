@@ -4,8 +4,9 @@ import { deterministicIntent } from "../src/modules/assistant/deterministic-reso
 const commands = [
   ["Create a plan called New York summer for June 3 through June 20", "CREATE_PLAN"],
   ["Add $1,000 to a savings plan for a truck", "CREATE_PLAN"],
-  ["Add $2,000 to savings for a truck", "CREATE_PLAN"],
-  ["Put 3000 dollars into savings for a wedding", "CREATE_PLAN"],
+  ["Add $2,000 to savings for a truck", "TRACK_SAVINGS"],
+  ["Add two thousand dollar to truck savings", "TRACK_SAVINGS"],
+  ["Put 3000 dollars into savings for a wedding", "TRACK_SAVINGS"],
   ["Add a 5000 dollar savings goal for a car", "CREATE_PLAN"],
   ["Make a house renovation plan with a twenty thousand dollar goal", "CREATE_PLAN"],
   ["Start a birthday dinner group for next Friday", "CREATE_PLAN"],
@@ -17,9 +18,9 @@ const commands = [
   ["Invite alex@example.com to Lisbon", "INVITE_PERSON"],
   ["Bring @maria into the Bali plan", "INVITE_PERSON"],
   ["Add Sam to our New York trip", "INVITE_PERSON"],
-  ["Add $200 I saved to our car plan", null],
-  ["Record my 50 dollar contribution to the holiday fund", null],
-  ["I deposited 100 dollars into our savings", null],
+  ["Add $200 I saved to our car plan", "TRACK_SAVINGS"],
+  ["Record my 50 dollar contribution to the holiday fund", "TRACK_SAVINGS"],
+  ["I deposited 100 dollars into our savings", "TRACK_SAVINGS"],
   ["What is the weather tomorrow?", null]
 ] as const;
 

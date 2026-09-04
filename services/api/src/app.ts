@@ -10,6 +10,7 @@ import { coreRoutes } from "./modules/core/routes.js";
 import { expenseRoutes } from "./modules/expenses/routes.js";
 import { notificationRoutes } from "./modules/notifications/routes.js";
 import { assistantRoutes } from "./modules/assistant/routes.js";
+import { savingsRoutes } from "./modules/savings/routes.js";
 import { registerDatabase } from "./platform/database.js";
 import { registerErrorHandling } from "./platform/errors.js";
 import { loggerOptions } from "./platform/logger.js";
@@ -61,6 +62,7 @@ export async function createApp(environment: Environment) {
       await versionedApi.register(expenseRoutes);
       await versionedApi.register(notificationRoutes(environment));
       await versionedApi.register(assistantRoutes(environment));
+      await versionedApi.register(savingsRoutes);
     },
     { prefix: "/api/v1" }
   );

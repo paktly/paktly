@@ -197,15 +197,17 @@ export function fallbackAssistantDraft(prompt: string, intent: ReturnType<typeof
   const fallbackIntent = intent ?? "UNSUPPORTED";
   const clarification = fallbackIntent === "CREATE_PLAN"
     ? "What would you like to call the new plan?"
-    : fallbackIntent === "CREATE_EXPENSE"
-      ? "Please say the expense, amount, and plan once more."
+      : fallbackIntent === "CREATE_EXPENSE"
+        ? "Please say the expense, amount, and plan once more."
+      : fallbackIntent === "TRACK_SAVINGS"
+        ? "Please say how much you saved and which plan should track it."
       : fallbackIntent === "INVITE_PERSON"
         ? "Please say who to invite and which plan to use."
         : null;
   return {
     intent: fallbackIntent,
     summary: savingsAction
-      ? "Savings contributions by voice are not available yet"
+      ? "Track savings outside Paktly"
       : fallbackIntent === "UNSUPPORTED" ? "That voice action is not available yet" : "Paktly needs one more detail",
     needsClarification: fallbackIntent !== "UNSUPPORTED",
     clarification,
@@ -236,6 +238,9 @@ function applyConfirmationOverrides(draft: AssistantDraft, overrides: z.infer<ty
   }
   if (draft.intent === "CREATE_EXPENSE") {
     return assistantDraftSchema.parse({ ...draft, description: overrides.description ?? draft.description, amountMinor: overrides.amountMinor ?? draft.amountMinor, category: overrides.category ?? draft.category, expenseDate: overrides.expenseDate ?? draft.expenseDate });
+  }
+  if (draft.intent === "TRACK_SAVINGS") {
+    return assistantDraftSchema.parse({ ...draft, amountMinor: overrides.amountMinor ?? draft.amountMinor });
   }
   if (draft.intent === "INVITE_PERSON" && overrides.inviteIdentifiers) {
     return assistantDraftSchema.parse({ ...draft, inviteIdentifiers: [...new Set(overrides.inviteIdentifiers)], inviteIdentifier: overrides.inviteIdentifiers[0] });
@@ -286,6 +291,18 @@ export function validateAssistantDraft(
   if (draft.needsClarification) return draft;
   const plan = draft.planId ? plans.get(draft.planId) : undefined;
   if (!plan) return clarify(draft, "Which plan should I use?");
+  if (draft.intent === "TRACK_SAVINGS") {
+    if (!draft.amountMinor) return clarify(draft, "How much did you save outside Paktly?");
+    return {
+      ...draft,
+      summary: draft.summary || "Track savings outside Paktly",
+      needsClarification: false,
+      clarification: null,
+      currency: draft.currency?.toUpperCase() ?? plan.currency,
+      payerId: actorId,
+      participantIds: []
+    };
+  }
   if (draft.intent === "INVITE_PERSON") {
     const inviteIdentifiers = draft.inviteIdentifiers.length ? [...new Set(draft.inviteIdentifiers)] : draft.inviteIdentifier ? [draft.inviteIdentifier] : [];
     if (!inviteIdentifiers.length) return clarify(draft, "Who would you like to invite?");

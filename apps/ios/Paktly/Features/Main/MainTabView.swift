@@ -86,7 +86,8 @@ struct MainTabView: View {
             item: Binding(
                 get: { model.presentedPlan },
                 set: { value in if value == nil { model.dismissPresentedPlan() } }
-            )
+            ),
+            onDismiss: { model.setActivePlan(nil) }
         ) { plan in
             NavigationStack { GroupDetailView(groupID: plan.id) }
         }
@@ -125,6 +126,7 @@ struct MainTabView: View {
 
     private func tabButton(_ tab: PaktlyTab) -> some View {
         Button {
+            if selection != tab { model.setActivePlan(nil) }
             withAnimation(.easeOut(duration: 0.2)) { selection = tab }
         } label: {
             VStack(spacing: 4) {

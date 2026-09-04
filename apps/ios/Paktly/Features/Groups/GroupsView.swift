@@ -4,9 +4,10 @@ struct GroupsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var creating = false
     @State private var joining = false
+    @State private var navigationPath: [String] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: 18) {
                     HStack(alignment: .bottom) {
@@ -96,6 +97,7 @@ struct GroupsView: View {
             .sheet(isPresented: $joining) { JoinGroupView() }
             .refreshable { await model.refresh() }
         }
+        .onChange(of: navigationPath) { _, path in model.setActivePlan(path.last) }
     }
 
     private func indexColor(_ id: String) -> Color {

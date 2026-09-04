@@ -4,6 +4,7 @@ struct HomeView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var showingNotifications: Bool
     let onOpenBalances: () -> Void
+    @State private var navigationPath: [String] = []
 
     private var firstName: String {
         model.currentUser?.displayName.split(separator: " ").first.map(String.init) ?? "there"
@@ -13,7 +14,7 @@ struct HomeView: View {
     private var recentPlans: [APIGroup] { Array(model.groups.prefix(3)) }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: 22) {
                     header
@@ -31,6 +32,7 @@ struct HomeView: View {
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { id in GroupDetailView(groupID: id) }
         }
+        .onChange(of: navigationPath) { _, path in model.setActivePlan(path.last) }
     }
 
     private var invitationsSection: some View {

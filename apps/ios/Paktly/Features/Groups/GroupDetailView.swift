@@ -111,9 +111,6 @@ struct GroupDetailView: View {
             InviteView(groupID: groupID, canManageJoinLink: ["OWNER", "ADMIN"].contains(group?.role ?? ""))
         }
         .onAppear { model.setActivePlan(groupID) }
-        .onDisappear {
-            if model.activePlanId == groupID { model.setActivePlan(nil) }
-        }
         .onChange(of: model.lastExpenseMutation) { _, mutation in
             guard mutation?.planID == groupID else { return }
             selectedTab = .expenses

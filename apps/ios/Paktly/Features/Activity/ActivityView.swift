@@ -6,6 +6,7 @@ struct ActivityView: View {
     @State private var searchText = ""
     @State private var isLoading = false
     @State private var loadError: String?
+    @State private var navigationPath: [String] = []
 
     private var visibleEvents: [APIActivity] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -18,7 +19,7 @@ struct ActivityView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 18) {
@@ -42,6 +43,7 @@ struct ActivityView: View {
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { GroupDetailView(groupID: $0) }
         }
+        .onChange(of: navigationPath) { _, path in model.setActivePlan(path.last) }
     }
 
     private var header: some View {

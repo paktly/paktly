@@ -3,18 +3,18 @@ import SwiftUI
 struct ActivityView: View {
     @EnvironmentObject private var model: AppModel
     @State private var events: [APIActivity] = []
-    @State private var selectedPlanID: String?
+    @State private var searchText = ""
     @State private var isLoading = false
     @State private var loadError: String?
 
     private var visibleEvents: [APIActivity] {
-        guard let selectedPlanID else { return events }
-        return events.filter { $0.groupId == selectedPlanID }
-    }
-
-    private var filterPlans: [APIGroup] {
-        let ids = Set(events.compactMap(\.groupId))
-        return model.groups.filter { ids.contains($0.id) }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return events }
+        return events.filter { event in
+            event.summary.localizedStandardContains(query)
+                || event.groupName?.localizedStandardContains(query) == true
+                || event.type.replacingOccurrences(of: "_", with: " ").localizedStandardContains(query)
+        }
     }
 
     var body: some View {
@@ -23,7 +23,7 @@ struct ActivityView: View {
                 ScrollView {
                     LazyVStack(spacing: 18) {
                         header
-                        filters
+                        searchBar
                         activitySection
                         Spacer(minLength: 20)
                     }
@@ -67,35 +67,47 @@ struct ActivityView: View {
         }
     }
 
-    private var filters: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                filterButton(title: "All plans", planID: nil)
-                ForEach(filterPlans) { group in filterButton(title: group.name, planID: group.id) }
+    private var searchBar: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(PaktlyColor.secondaryInk)
+            TextField("Search activity or plans", text: $searchText)
+                .font(.subheadline)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(PaktlyColor.secondaryInk.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
-        .contentMargins(.horizontal, 0, for: .scrollContent)
-    }
-
-    private func filterButton(title: String, planID: String?) -> some View {
-        let selected = selectedPlanID == planID
-        return Button {
-            withAnimation(.easeInOut(duration: 0.2)) { selectedPlanID = planID }
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? Color.white : PaktlyColor.secondaryInk)
-                .lineLimit(1)
-                .padding(.horizontal, 15)
-                .frame(height: 38)
-                .background(selected ? PaktlyColor.forest : PaktlyColor.surface, in: Capsule())
+        .padding(.horizontal, 15)
+        .frame(height: 48)
+        .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(PaktlyColor.secondaryInk.opacity(0.12), lineWidth: 1)
         }
-        .buttonStyle(.plain)
     }
 
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PaktlySectionHeader(title: selectedPlanID == nil ? "Most recent" : "Plan activity")
+            HStack(alignment: .firstTextBaseline) {
+                PaktlySectionHeader(title: searchText.isEmpty ? "Most recent" : "Search results")
+                Spacer()
+                if !searchText.isEmpty {
+                    Text("\(visibleEvents.count) found")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(PaktlyColor.secondaryInk)
+                }
+            }
             if isLoading && events.isEmpty {
                 HStack(spacing: 12) {
                     ProgressView().tint(PaktlyColor.forest)
@@ -105,7 +117,10 @@ struct ActivityView: View {
             } else if let loadError, events.isEmpty {
                 PaktlyStatusBanner(icon: "wifi.exclamationmark", title: "Couldn’t load activity", message: loadError, tint: PaktlyColor.coral)
             } else if visibleEvents.isEmpty {
-                contentUnavailable("No activity yet", "Updates for this plan will appear here.")
+                contentUnavailable(
+                    searchText.isEmpty ? "No activity yet" : "No matching activity",
+                    searchText.isEmpty ? "Updates across your plans will appear here." : "Try a plan name, person, expense, or settlement."
+                )
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(visibleEvents) { event in
@@ -163,8 +178,8 @@ struct ActivityView: View {
 
     private func revealFocusedEvent(using proxy: ScrollViewProxy) {
         guard let focused = model.focusedActivityEntityId,
-              let event = events.first(where: { $0.entityId == focused }) else { return }
-        selectedPlanID = event.groupId
+              events.contains(where: { $0.entityId == focused }) else { return }
+        searchText = ""
         withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(focused, anchor: .center) }
     }
 

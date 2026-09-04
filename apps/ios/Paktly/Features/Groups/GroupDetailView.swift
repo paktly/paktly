@@ -554,6 +554,7 @@ struct InviteView: View {
     @Environment(\.dismiss) private var dismiss
     let groupID: String
     let canManageJoinLink: Bool
+    var completed: (() -> Void)? = nil
     @State private var identifier = ""
     @State private var developmentToken: String?
     @State private var sending = false
@@ -722,6 +723,7 @@ struct InviteView: View {
             developmentToken = try await model.client.invite(groupID: groupID, identifier: normalizedIdentifier)
             sentIdentifier = normalizedIdentifier
             identifier = ""
+            completed?()
         } catch {
             developmentToken = nil
             errorMessage = "We couldn’t send this invitation. Check the username or email and try again."

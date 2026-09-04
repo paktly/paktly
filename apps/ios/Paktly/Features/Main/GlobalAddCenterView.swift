@@ -105,13 +105,13 @@ struct GlobalAddCenterView: View {
                 }
             }
             .navigationDestination(for: GlobalAddAction.self) { action in
-                GlobalPlanPickerView(action: action)
+                GlobalPlanPickerView(action: action, completed: { dismiss() })
             }
             .sheet(isPresented: $showingCreatePlan) {
-                CreatePlanView().environmentObject(model)
+                CreatePlanView(completed: { dismiss() }).environmentObject(model)
             }
             .sheet(isPresented: $showingAskPaktly) {
-                AskPaktlyView(contextPlanID: model.activePlanId)
+                AskPaktlyView(contextPlanID: model.activePlanId, completed: { dismiss() })
                     .environmentObject(model)
             }
             .sheet(item: $expenseContext) { context in
@@ -120,14 +120,18 @@ struct GlobalAddCenterView: View {
                     currency: context.group.defaultCurrency,
                     members: context.members,
                     existing: nil,
-                    completed: { await model.refresh() }
+                    completed: {
+                        await model.refresh()
+                        dismiss()
+                    }
                 )
                 .environmentObject(model)
             }
             .sheet(item: $invitePlan) { group in
                 InviteView(
                     groupID: group.id,
-                    canManageJoinLink: ["OWNER", "ADMIN"].contains(group.role ?? "")
+                    canManageJoinLink: ["OWNER", "ADMIN"].contains(group.role ?? ""),
+                    completed: { dismiss() }
                 )
                 .environmentObject(model)
             }
@@ -219,6 +223,7 @@ private struct ExpensePlanContext: Identifiable {
 private struct GlobalPlanPickerView: View {
     @EnvironmentObject private var model: AppModel
     let action: GlobalAddAction
+    let completed: () -> Void
     @State private var expenseContext: ExpensePlanContext?
     @State private var invitePlan: APIGroup?
     @State private var loadingPlanID: String?
@@ -288,14 +293,18 @@ private struct GlobalPlanPickerView: View {
                 currency: context.group.defaultCurrency,
                 members: context.members,
                 existing: nil,
-                completed: { await model.refresh() }
+                completed: {
+                    await model.refresh()
+                    completed()
+                }
             )
             .environmentObject(model)
         }
         .sheet(item: $invitePlan) { group in
             InviteView(
                 groupID: group.id,
-                canManageJoinLink: ["OWNER", "ADMIN"].contains(group.role ?? "")
+                canManageJoinLink: ["OWNER", "ADMIN"].contains(group.role ?? ""),
+                completed: completed
             )
             .environmentObject(model)
         }

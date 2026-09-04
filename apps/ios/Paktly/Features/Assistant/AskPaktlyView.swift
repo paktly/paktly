@@ -9,6 +9,7 @@ struct AskPaktlyView: View {
     @StateObject private var recorder = PaktlyVoiceRecorder()
     @StateObject private var realtime = PaktlyRealtimeTranscriber()
     let contextPlanID: String?
+    var completed: (() -> Void)? = nil
     @State private var transcript: String?
     @State private var draft: APIAssistantDraft?
     @State private var confirmationToken: String?
@@ -351,6 +352,7 @@ struct AskPaktlyView: View {
                     await model.refresh()
                 default: throw AssistantActionError.invalidDraft
                 }
+                completed?()
                 dismiss()
             } catch { errorMessage = "We couldn’t save this yet. Please record it again or use the standard form." }
             isConfirming = false

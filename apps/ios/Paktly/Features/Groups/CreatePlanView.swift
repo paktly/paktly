@@ -66,6 +66,7 @@ struct CreatePlanView: View {
 
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    var completed: (() -> Void)? = nil
     @State private var draft = PlanDraft()
     @State private var currentStep: Step = .details
     @State private var memberEmailInput = ""
@@ -534,6 +535,7 @@ struct CreatePlanView: View {
                     currency: draft.currency,
                     memberIdentifiers: draft.memberIdentifiers
                 )
+                completed?()
                 dismiss()
             } catch let failure as PlanInvitationFailure {
                 let recipients = failure.failedIdentifiers.joined(separator: ", ")

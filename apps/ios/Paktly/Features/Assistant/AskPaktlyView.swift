@@ -15,6 +15,7 @@ struct AskPaktlyView: View {
     @State private var isConfirming = false
     @State private var attemptedAutomaticStart = false
     @State private var errorMessage: String?
+    @State private var isRealtimeAvailable = false
 
     var body: some View {
         NavigationStack {
@@ -90,6 +91,13 @@ struct AskPaktlyView: View {
                 Text(recorder.formattedDuration)
                     .font(.system(.body, design: .monospaced, weight: .semibold))
                     .foregroundStyle(PaktlyColor.coral)
+            }
+            if recorder.isRecording, !isRealtimeAvailable {
+                Label("Live words are unavailable. Your command will be transcribed when you stop.", systemImage: "waveform.badge.exclamationmark")
+                    .font(.caption)
+                    .foregroundStyle(PaktlyColor.secondaryInk)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 330)
             }
             if recorder.isRecording, !realtime.transcript.isEmpty {
                 Text(realtime.transcript)
@@ -196,8 +204,19 @@ struct AskPaktlyView: View {
         isStarting = true
         defer { isStarting = false }
         do {
-            try await realtime.start(client: model.client)
-            try await recorder.start { [realtime] data in realtime.append(data) }
+            do {
+                try await realtime.start(client: model.client)
+                isRealtimeAvailable = true
+            } catch {
+                realtime.stop()
+                isRealtimeAvailable = false
+            }
+            let liveTranscriber = realtime
+            if isRealtimeAvailable {
+                try await recorder.start { data in liveTranscriber.append(data) }
+            } else {
+                try await recorder.start()
+            }
         }
         catch PaktlyVoiceRecorder.RecorderError.microphonePermissionDenied {
             errorMessage = "Microphone access is off. Enable it for Paktly in Settings to use voice actions."
@@ -224,7 +243,8 @@ struct AskPaktlyView: View {
     }
 
     private func reset() {
-        recorder.cancel(); realtime.stop(); transcript = nil; draft = nil; confirmationToken = nil
+        recorder.cancel(); realtime.stop(); isRealtimeAvailable = false
+        transcript = nil; draft = nil; confirmationToken = nil
         confirmationIdempotencyKey = UUID().uuidString; errorMessage = nil
     }
 

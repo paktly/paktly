@@ -2,7 +2,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 import Vision
-import VisionKit
+@preconcurrency import VisionKit
 
 private struct ReceiptExtraction: Sendable {
     let merchant: String
@@ -304,7 +304,7 @@ private struct ReceiptDocumentCamera: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
 
-    @MainActor final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+    @MainActor final class Coordinator: NSObject, @preconcurrency VNDocumentCameraViewControllerDelegate {
         let completed: ([Data]?) -> Void
         init(completed: @escaping ([Data]?) -> Void) { self.completed = completed }
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) { completed(nil) }

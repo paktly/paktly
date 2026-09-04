@@ -88,6 +88,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
       instructions: [
         "You interpret natural-language requests for Paktly, a shared planning and expense app.",
         "Return a draft only. Never claim an action was executed.",
+        "When intentHint is present, treat it as authoritative and populate every field required for that intent.",
         "Supported executable intents are creating an expense, creating a plan, or inviting people. Saving goals may be created as plans, but recording a deposit, contribution, transfer, settlement, or balance adjustment is UNSUPPORTED until that money workflow is available.",
         "Treat create, start, or make a plan, group, or trip as CREATE_PLAN. This always means a new plan: set planId=null and never ask which existing plan to use.",
         "Treat invite, add, or bring a named person, username, or email into a plan as INVITE_PERSON; resolve the destination only from accessible plans.",
@@ -103,6 +104,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
         "Use the plan currency unless another currency is explicit.",
         "If a required fact is ambiguous or missing, set needsClarification=true and ask one concise question.",
         "CREATE_PLAN needs only a concise planName; put destinations, duration, and other supplied details in planDescription. Dates are optional.",
+        "A request such as 'add a $1,000 savings plan for a truck' means CREATE_PLAN when it describes a new goal. Name it 'Truck Savings' and describe $1,000 as the planning target; do not claim that money was deposited. By contrast, a request to contribute or deposit into an identified existing plan is UNSUPPORTED.",
         "Treat conversational openings and speech disfluencies as instructions, not content. Remove repeated false starts such as 'let's, let's', and do not include phrases like 'create a', 'make a', or 'let's' in planName or planDescription unless semantically necessary.",
         "For example, 'let's, let's create a save together plan for a car' should have a concise name such as 'Car Savings' and a description about saving together for a car, with no duplicated filler.",
         "For anything else return UNSUPPORTED."

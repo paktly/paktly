@@ -3,6 +3,8 @@ import { deterministicIntent } from "../src/modules/assistant/deterministic-reso
 
 const commands = [
   ["Create a plan called New York summer for June 3 through June 20", "CREATE_PLAN"],
+  ["Add $1,000 to a savings plan for a truck", "CREATE_PLAN"],
+  ["Add a 5000 dollar savings goal for a car", "CREATE_PLAN"],
   ["Make a house renovation plan with a twenty thousand dollar goal", "CREATE_PLAN"],
   ["Start a birthday dinner group for next Friday", "CREATE_PLAN"],
   ["I paid 87 dollars 50 for dinner in Lisbon, split it equally", "CREATE_EXPENSE"],

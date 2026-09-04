@@ -23,15 +23,22 @@ private actor ReceiptOCRService {
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             request.automaticallyDetectsLanguage = true
+            request.customWords = ["TOTAL", "GRAND TOTAL", "AMOUNT DUE", "BALANCE DUE", "SUBTOTAL", "TAX", "VAT"]
             try VNImageRequestHandler(cgImage: cgImage, orientation: image.visionOrientation).perform([request])
             return (request.results ?? [])
+                .sorted {
+                    if abs($0.boundingBox.midY - $1.boundingBox.midY) > 0.012 {
+                        return $0.boundingBox.midY > $1.boundingBox.midY
+                    }
+                    return $0.boundingBox.minX < $1.boundingBox.minX
+                }
                 .compactMap { $0.topCandidates(1).first?.string.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
         }
         guard !lines.isEmpty else { throw ReceiptScanError.noText }
 
         let merchant = Self.merchant(from: lines)
-        let amount = Self.total(from: lines) ?? ""
+        let amount = ReceiptTotalParser.total(from: lines) ?? ""
         let combined = lines.joined(separator: " ")
         let date = (try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue))?
             .firstMatch(in: combined, range: NSRange(location: 0, length: (combined as NSString).length))?.date ?? .now
@@ -51,48 +58,6 @@ private actor ReceiptOCRService {
             let hasLetter = line.rangeOfCharacter(from: .letters) != nil
             return hasLetter && line.count >= 2 && line.count <= 80 && !ignored.contains(where: lowered.contains)
         } ?? "Receipt expense"
-    }
-
-    private static func total(from lines: [String]) -> String? {
-        let preferred = lines.filter { line in
-            let value = normalizeNumerals(line).lowercased()
-            let totalWords = ["grand total", "amount due", "balance due", "total", "الإجمالي", "الإجمالى", "المجموع", "مجموع", "المبلغ المطلوب", "الصافي"]
-            let excludedWords = ["subtotal", "sub total", "tax", "vat", "change", "الضريبة", "الفرعي", "الباقي"]
-            return totalWords.contains(where: value.contains) && !excludedWords.contains(where: value.contains)
-        }
-        for line in preferred.reversed() {
-            if let amount = monetaryValues(in: line, allowWholeNumbers: true).last { return amount }
-        }
-
-        let currencyMarkers = ["$", "€", "£", "¥", "₦", "₹", "د.إ", "د.ك", "ر.س", "AED", "KWD", "SAR", "USD", "EUR", "GBP"]
-        let fallback = lines.flatMap { line -> [String] in
-            let normalized = normalizeNumerals(line)
-            let hasCurrency = currencyMarkers.contains { normalized.localizedCaseInsensitiveContains($0) }
-            return monetaryValues(in: normalized, allowWholeNumbers: hasCurrency)
-        }
-        return fallback.max { (Decimal(string: $0) ?? 0) < (Decimal(string: $1) ?? 0) }
-    }
-
-    private static func monetaryValues(in line: String, allowWholeNumbers: Bool) -> [String] {
-        let value = normalizeNumerals(line)
-        return value.matches(of: /(?:\d{1,3}(?:[,. ]\d{3})+|\d+)(?:[.,]\d{1,3})?/)
-            .map { String($0.output).replacingOccurrences(of: " ", with: "") }
-            .filter { allowWholeNumbers || $0.contains(".") || $0.contains(",") }
-            .compactMap { raw in
-                let amount = normalizedAmount(raw)
-                guard let decimal = Decimal(string: amount), decimal > 0, decimal < 1_000_000_000 else { return nil }
-                return NSDecimalNumber(decimal: decimal).stringValue
-            }
-    }
-
-    private static func normalizedAmount(_ raw: String) -> String {
-        guard let comma = raw.lastIndex(of: ","), let period = raw.lastIndex(of: ".") else {
-            return raw.replacingOccurrences(of: ",", with: ".")
-        }
-        if comma > period {
-            return raw.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
-        }
-        return raw.replacingOccurrences(of: ",", with: "")
     }
 
     private static func normalizeNumerals(_ value: String) -> String {

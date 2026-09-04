@@ -78,8 +78,6 @@ struct CreatePlanView: View {
     @State private var showingCurrencies = false
     @FocusState private var focusedField: FocusField?
 
-    private let supportedCurrencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "SGD", "CHF", "NOK"]
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -114,8 +112,8 @@ struct CreatePlanView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingCurrencies) {
-                CurrencyPicker(currencies: supportedCurrencies, selection: $draft.currency)
-                    .presentationDetents([.medium])
+                CurrencyPicker(selection: $draft.currency)
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
         }
@@ -580,7 +578,7 @@ struct CreatePlanView: View {
     }
 
     private func isValidCurrency(_ value: String) -> Bool {
-        supportedCurrencies.contains(value)
+        PaktlyCurrencyCatalog.all.contains(value)
     }
 
     private func isValidInviteIdentifier(_ value: String) -> Bool {
@@ -605,7 +603,7 @@ struct CreatePlanView: View {
     }
 
     private func currencyDisplayName(_ code: String) -> String {
-        Locale.current.localizedString(forCurrencyCode: code) ?? code
+        PaktlyCurrencyCatalog.name(for: code)
     }
 }
 
@@ -669,41 +667,87 @@ private struct PlanTypePicker: View {
     }
 }
 
-private struct CurrencyPicker: View {
-    let currencies: [String]
+struct CurrencyPicker: View {
     @Binding var selection: String
     @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var browsingAll = false
+
+    private var currencies: [String] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return PaktlyCurrencyCatalog.all.filter { PaktlyCurrencyCatalog.matches($0, query: trimmed) } }
+        return browsingAll ? PaktlyCurrencyCatalog.all : PaktlyCurrencyCatalog.popular
+    }
 
     var body: some View {
         NavigationStack {
-            List(currencies, id: \.self) { code in
-                Button {
-                    selection = code
-                    dismiss()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(Locale.current.localizedString(forCurrencyCode: code) ?? code)
-                                .foregroundStyle(PaktlyColor.ink)
-                            Text(code)
-                                .font(.caption)
-                                .foregroundStyle(PaktlyColor.secondaryInk)
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(PaktlyColor.secondaryInk)
+                    TextField("Search code, symbol, currency, or country", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if !query.isEmpty {
+                        Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(PaktlyColor.secondaryInk)
+                            .accessibilityLabel("Clear currency search")
+                    }
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 16).stroke(PaktlyColor.secondaryInk.opacity(0.13)) }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+
+                if currencies.isEmpty {
+                    PaktlyEmptyState(title: "No currency found", message: "Try a code such as NGN, a symbol such as ₦, or a country such as Nigeria.", icon: "magnifyingglass")
+                        .padding(20)
+                    Spacer()
+                } else {
+                    List {
+                        Section(query.isEmpty && !browsingAll ? "Popular" : "Currencies") {
+                            ForEach(currencies, id: \.self) { code in
+                                Button {
+                                    selection = code
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 13) {
+                                        Text(PaktlyCurrencyCatalog.symbol(for: code))
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(PaktlyColor.forest)
+                                            .frame(width: 42, height: 42)
+                                            .background(PaktlyColor.mint.opacity(0.35), in: RoundedRectangle(cornerRadius: 13))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(PaktlyCurrencyCatalog.name(for: code)).foregroundStyle(PaktlyColor.ink)
+                                            Text(code).font(.caption.weight(.semibold)).foregroundStyle(PaktlyColor.secondaryInk)
+                                        }
+                                        Spacer()
+                                        if selection == code {
+                                            Image(systemName: "checkmark.circle.fill").foregroundStyle(PaktlyColor.forest)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(PaktlyColor.surface)
+                            }
                         }
-                        Spacer()
-                        if selection == code {
-                            Image(systemName: "checkmark")
-                                .font(.body.weight(.bold))
+                        if query.isEmpty && !browsingAll {
+                            Button("Browse all currencies") { browsingAll = true }
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(PaktlyColor.forest)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .listRowBackground(PaktlyColor.surface)
                         }
                     }
-                    .contentShape(Rectangle())
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(PaktlyColor.surface)
             }
-            .scrollContentBackground(.hidden)
             .background(PaktlyColor.background)
-            .navigationTitle("Default currency")
+            .navigationTitle("Plan currency")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

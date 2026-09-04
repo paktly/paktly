@@ -23,11 +23,13 @@ struct AskPaktlyView: View {
     @State private var editedName = ""
     @State private var editedDescription = ""
     @State private var editedAmount = ""
+    @State private var editedCurrency = "USD"
     @State private var editedInvitees = ""
     @State private var isEditingDraft = false
     @State private var microphoneNeedsSettings = false
     @State private var isReturningFromSettings = false
     @State private var realtimeStartTask: Task<Void, Never>?
+    @State private var showingCurrencyPicker = false
 
     var body: some View {
         NavigationStack {
@@ -73,6 +75,11 @@ struct AskPaktlyView: View {
                 isReturningFromSettings = false
                 microphoneNeedsSettings = false
                 errorMessage = nil
+            }
+            .sheet(isPresented: $showingCurrencyPicker) {
+                CurrencyPicker(selection: $editedCurrency)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
         }
     }
@@ -212,6 +219,24 @@ struct AskPaktlyView: View {
         if value.planName != nil {
             if isEditingDraft { editableRow("Plan name", text: $editedName) }
             else { detailRow("Name", editedName) }
+        }
+        if value.intent == "CREATE_PLAN" {
+            if isEditingDraft {
+                Button { showingCurrencyPicker = true } label: {
+                    HStack {
+                        Text("PLAN CURRENCY").font(.caption2.weight(.bold)).tracking(0.8).foregroundStyle(PaktlyColor.secondaryInk)
+                        Spacer()
+                        Text("\(PaktlyCurrencyCatalog.symbol(for: editedCurrency))  \(editedCurrency)")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.forest)
+                        Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(PaktlyColor.secondaryInk)
+                    }
+                    .padding(.vertical, 10).padding(.horizontal, 12)
+                    .background(PaktlyColor.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            } else {
+                detailRow("Currency", "\(PaktlyCurrencyCatalog.symbol(for: editedCurrency)) \(editedCurrency)")
+            }
         }
         if value.intent == "CREATE_PLAN", !editedDescription.isEmpty {
             if isEditingDraft { editableRow("Description", text: $editedDescription) }
@@ -424,6 +449,7 @@ struct AskPaktlyView: View {
         editedName = value.planName ?? ""
         editedDescription = value.intent == "CREATE_PLAN" ? (value.planDescription ?? "") : (value.description ?? "")
         editedAmount = value.amountMinor.map { String(format: "%.2f", Double($0) / 100) } ?? ""
+        editedCurrency = value.currency ?? "USD"
         editedInvitees = (value.inviteIdentifiers?.isEmpty == false ? value.inviteIdentifiers! : [value.inviteIdentifier].compactMap { $0 }).joined(separator: ", ")
     }
 
@@ -439,6 +465,7 @@ struct AskPaktlyView: View {
             planName: value.intent == "CREATE_PLAN" ? editedName : nil,
             planDescription: value.intent == "CREATE_PLAN" ? editedDescription : nil,
             description: value.intent == "CREATE_EXPENSE" ? editedDescription : nil,
+            currency: value.intent == "CREATE_PLAN" ? editedCurrency : nil,
             amountMinor: ["CREATE_EXPENSE", "TRACK_SAVINGS"].contains(value.intent) ? amount : nil,
             category: value.category,
             expenseDate: value.expenseDate,

@@ -8,8 +8,9 @@ import { SmtpEmailProvider } from "../auth/email-provider.js";
 import { verifySocketFiToken } from "../auth/socketfi.js";
 import { isValidUsername, normalizeUsername } from "../auth/username.js";
 import { createFederatedSession, verifyAppleIdentityToken, verifyGoogleIdentityToken } from "../auth/federated.js";
+import { isSupportedCurrency } from "../../platform/currencies.js";
 
-const currency = z.string().trim().length(3).transform((value) => value.toUpperCase());
+const currency = z.string().trim().length(3).transform((value) => value.toUpperCase()).refine(isSupportedCurrency, "Choose a supported ISO currency.");
 const uuid = z.string().uuid();
 const joinCredential = z.object({
   token: z.string().trim().min(20).max(200).optional(),

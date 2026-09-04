@@ -313,7 +313,7 @@ private struct AssistantInterpretResponse: Decodable {
 }
 struct APIAssistantOverrides: Encodable, Sendable {
     let planName: String?; let planDescription: String?; let description: String?
-    let amountMinor: Int?; let category: String?; let expenseDate: String?; let inviteIdentifiers: [String]?
+    let currency: String?; let amountMinor: Int?; let category: String?; let expenseDate: String?; let inviteIdentifiers: [String]?
 }
 private struct AssistantConfirmRequest: Encodable { let token: String; let idempotencyKey: String; let overrides: APIAssistantOverrides }
 private struct AssistantConfirmResponse: Decodable { let draft: APIAssistantDraft }

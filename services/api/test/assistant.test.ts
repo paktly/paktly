@@ -143,4 +143,33 @@ describe("Ask Paktly draft validation", () => {
       clarification: null
     });
   });
+
+  it("keeps a plan currency out of its description", () => {
+    const result = validateAssistantDraft({
+      ...base,
+      intent: "CREATE_PLAN",
+      planId: null,
+      planName: "Lagos Holiday",
+      planDescription: "A holiday in Lagos using Nigerian naira as the primary currency",
+      currency: "NGN",
+      amountMinor: null
+    }, plans, actorId);
+    expect(result).toMatchObject({
+      currency: "NGN",
+      planDescription: "A holiday in Lagos",
+      needsClarification: false
+    });
+  });
+
+  it("rejects an invented plan currency", () => {
+    const result = validateAssistantDraft({
+      ...base,
+      intent: "CREATE_PLAN",
+      planId: null,
+      planName: "Unknown Currency Plan",
+      currency: "ZZZ",
+      amountMinor: null
+    }, plans, actorId);
+    expect(result).toMatchObject({ needsClarification: true, clarification: "Which currency should this plan use?" });
+  });
 });

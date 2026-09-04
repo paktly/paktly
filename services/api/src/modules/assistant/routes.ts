@@ -5,6 +5,7 @@ import { requireAuthentication } from "../auth/authentication.js";
 import { assistantDraftSchema, OpenAIAssistantProvider, type AssistantDraft, type AssistantProvider } from "./openai-provider.js";
 import { deterministicIntent, deterministicPlanId } from "./deterministic-resolution.js";
 import { issueDraftToken, verifyDraftToken } from "./draft-token.js";
+import { currencyDisplayName, isSupportedCurrency } from "../../platform/currencies.js";
 
 const requestSchema = z.object({
   prompt: z.string().trim().min(3).max(1_000),
@@ -16,6 +17,7 @@ const confirmationSchema = z.object({
   overrides: z.object({
     planName: z.string().trim().min(1).max(100).optional(),
     planDescription: z.string().trim().max(1_000).nullable().optional(),
+    currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).refine(isSupportedCurrency, "Choose a supported ISO currency.").optional(),
     description: z.string().trim().min(1).max(200).optional(),
     amountMinor: z.number().int().positive().optional(),
     category: z.enum(["Accommodation", "Flights", "Transportation", "Food", "Drinks", "Activities", "Shopping", "Groceries", "Tickets", "Fuel", "Fees", "Other"]).optional(),
@@ -234,7 +236,12 @@ export function fallbackAssistantDraft(prompt: string, intent: ReturnType<typeof
 
 function applyConfirmationOverrides(draft: AssistantDraft, overrides: z.infer<typeof confirmationSchema>["overrides"]): AssistantDraft {
   if (draft.intent === "CREATE_PLAN") {
-    return assistantDraftSchema.parse({ ...draft, planName: overrides.planName ?? draft.planName, planDescription: overrides.planDescription !== undefined ? overrides.planDescription : draft.planDescription });
+    return assistantDraftSchema.parse({
+      ...draft,
+      planName: overrides.planName ?? draft.planName,
+      planDescription: overrides.planDescription !== undefined ? overrides.planDescription : draft.planDescription,
+      currency: overrides.currency?.toUpperCase() ?? draft.currency
+    });
   }
   if (draft.intent === "CREATE_EXPENSE") {
     return assistantDraftSchema.parse({ ...draft, description: overrides.description ?? draft.description, amountMinor: overrides.amountMinor ?? draft.amountMinor, category: overrides.category ?? draft.category, expenseDate: overrides.expenseDate ?? draft.expenseDate });
@@ -280,12 +287,15 @@ export function validateAssistantDraft(
   if (draft.intent === "UNSUPPORTED") return draft;
   if (draft.intent === "CREATE_PLAN") {
     if (!draft.planName) return clarify(draft, "What would you like to call the plan?");
+    const planCurrency = draft.currency?.toUpperCase() ?? "USD";
+    if (!isSupportedCurrency(planCurrency)) return clarify(draft, "Which currency should this plan use?");
     return {
       ...draft,
       needsClarification: false,
       clarification: null,
       planId: null,
-      currency: draft.currency?.toUpperCase() ?? "USD"
+      currency: planCurrency,
+      planDescription: removeCurrencyMetadata(draft.planDescription, planCurrency)
     };
   }
   if (draft.needsClarification) return draft;
@@ -325,6 +335,20 @@ export function validateAssistantDraft(
   if (draft.splitMethod === "PERCENTAGE" && resolvedSplits.reduce((sum, entry) => sum + entry.value, 0) !== 10_000) return clarify(draft, "The split percentages must add up to 100%.");
   if (draft.splitMethod !== "EQUAL" && resolvedSplits.length === 0) return clarify(draft, "How should I divide this expense?");
   return { ...draft, payerId, participantIds, splitValues: resolvedSplits, currency: draft.currency?.toUpperCase() ?? plan.currency };
+}
+
+function removeCurrencyMetadata(description: string | null, code: string): string | null {
+  if (!description) return null;
+  const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedName = currencyDisplayName(code).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const currencyValue = `(?:${escaped}|${escapedName})`;
+  const patterns = [
+    new RegExp(`\\s*(?:with|using|use)?\\s*(?:the\\s+)?(?:primary|default|base|plan)\\s+currency\\s*(?:of|to|as|is|:)?\\s*${currencyValue}\\b`, "ig"),
+    new RegExp(`\\s*(?:using|use|with)\\s+${currencyValue}\\s+as\\s+(?:the\\s+)?(?:primary|default|base|plan)\\s+currency\\b`, "ig")
+  ];
+  const cleaned = patterns.reduce((value, pattern) => value.replace(pattern, ""), description)
+    .replace(/\s+([,.])/g, "$1").replace(/\s{2,}/g, " ").replace(/^[,.;:\s]+|[,;:\s]+$/g, "").trim();
+  return cleaned || null;
 }
 
 function resolveMember(query: string, members: { id: string; name?: string; username?: string | null; email?: string }[], actorId: string): string | undefined {

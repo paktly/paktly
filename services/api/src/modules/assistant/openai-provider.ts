@@ -107,6 +107,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
         "Use the plan currency unless another currency is explicit.",
         "If a required fact is ambiguous or missing, set needsClarification=true and ask one concise question.",
         "CREATE_PLAN needs only a concise planName; put destinations, duration, and other supplied details in planDescription. Dates are optional.",
+        "For CREATE_PLAN, treat an explicit primary, default, base, or plan currency as structured currency metadata. Return its ISO 4217 code in currency and never repeat the currency instruction in planName or planDescription. For example, 'Lagos holiday with Nigerian naira as the primary currency' uses currency NGN while the description contains only the useful holiday details.",
         "A request explicitly asking to create a new savings plan means CREATE_PLAN. A statement such as 'add $2,000 to truck savings' means TRACK_SAVINGS when Truck Savings identifies an accessible plan.",
         "Treat conversational openings and speech disfluencies as instructions, not content. Remove repeated false starts such as 'let's, let's', and do not include phrases like 'create a', 'make a', or 'let's' in planName or planDescription unless semantically necessary.",
         "For example, 'let's, let's create a save together plan for a car' should have a concise name such as 'Car Savings' and a description about saving together for a car, with no duplicated filler.",

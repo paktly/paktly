@@ -222,7 +222,7 @@ struct AddPeopleView: View {
                                 .font(.footnote)
                                 .foregroundStyle(PaktlyColor.secondaryInk)
                         } else {
-                            Text("Friend not found. Tap “Add a new friend” below to save them!")
+                            Text("Friend not found. Tap \"Add a new friend\" below to save them!")
                                 .font(.footnote)
                                 .foregroundStyle(PaktlyColor.secondaryInk)
                         }
@@ -474,7 +474,7 @@ struct FriendPickerView: View {
                 }
                 if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && matches.isEmpty {
                     Section("Not in your friends yet") {
-                        Text("Friend not found. Tap “Add a new friend" below to save them!")
+                        Text("Friend not found. Tap \"Add a new friend\" below to save them!")
                             .font(.footnote).foregroundStyle(PaktlyColor.secondaryInk)
                     }
                 }

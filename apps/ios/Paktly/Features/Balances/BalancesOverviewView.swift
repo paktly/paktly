@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BalancesOverviewView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     @State private var balances: [(APIGroup, [APIBalance])] = []
     var body: some View {
         NavigationStack {
@@ -9,9 +10,6 @@ struct BalancesOverviewView: View {
                 LazyVStack(spacing: 18) {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Balances")
-                                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                                .foregroundStyle(PaktlyColor.ink)
                             Text("A clear view of what comes in and goes out.")
                                 .font(.subheadline)
                                 .foregroundStyle(PaktlyColor.secondaryInk)
@@ -76,8 +74,49 @@ struct BalancesOverviewView: View {
             }
             .background(PaktlyColor.background.ignoresSafeArea())
             .navigationBarHidden(true)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                balancesHeader
+            }
             .task { await load() }
             .refreshable { await load() }
+        }
+    }
+
+    private var balancesHeader: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(width: 36, height: 36)
+                    .foregroundStyle(PaktlyColor.forest)
+                    .background(PaktlyColor.surface, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close balances")
+
+            Spacer()
+
+            Text("Balances")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(PaktlyColor.ink)
+
+            Spacer()
+
+            // Keeps the title optically centered while providing a comfortable
+            // tap target at the leading edge.
+            Color.clear
+                .frame(width: 36, height: 36)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(PaktlyColor.ink.opacity(0.06))
+                .frame(height: 0.5)
         }
     }
     private var summaryCard: some View {

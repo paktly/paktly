@@ -53,7 +53,6 @@ struct CreatePlanView: View {
     private enum FocusField: Hashable {
         case name
         case notes
-        case email
     }
 
     struct PlanDraft {
@@ -69,7 +68,6 @@ struct CreatePlanView: View {
     var completed: (() -> Void)? = nil
     @State private var draft = PlanDraft()
     @State private var currentStep: Step = .details
-    @State private var memberEmailInput = ""
     @State private var showingFriendPicker = false
     @State private var creating = false
     @State private var planCreated = false
@@ -255,28 +253,6 @@ struct CreatePlanView: View {
                 .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
             }
             .buttonStyle(.plain)
-            formField("Username or email", hint: "Sent after the plan is created") {
-                HStack(spacing: 10) {
-                    TextField("@username or friend@example.com", text: $memberEmailInput)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .textContentType(.emailAddress)
-                        .submitLabel(.done)
-                        .focused($focusedField, equals: .email)
-                        .onSubmit { addMemberEmail() }
-                    Button { addMemberEmail() } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(PaktlyColor.background)
-                            .frame(width: 44, height: 44)
-                            .background(PaktlyColor.forest, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!isValidInviteIdentifier(memberEmailInput))
-                    .accessibilityLabel("Add invitation")
-                }
-            }
             if draft.memberIdentifiers.isEmpty {
                 infoPanel(
                     icon: "person.2.fill",
@@ -606,27 +582,6 @@ struct CreatePlanView: View {
 
     private func isValidCurrency(_ value: String) -> Bool {
         PaktlyCurrencyCatalog.all.contains(value)
-    }
-
-    private func isValidInviteIdentifier(_ value: String) -> Bool {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.contains("@") && !trimmed.hasPrefix("@") {
-            return trimmed.contains(".") && trimmed.count > 4
-        }
-        let username = trimmed.lowercased().replacingOccurrences(of: " ", with: "_").trimmingCharacters(in: CharacterSet(charactersIn: "@"))
-        return username.count >= 3 && username.count <= 30 && username.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
-    }
-
-    private func addMemberEmail() {
-        let normalized = memberEmailInput.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard isValidInviteIdentifier(normalized) else { return }
-        let identifier = normalized.hasPrefix("@")
-            ? String(normalized.dropFirst()).replacingOccurrences(of: " ", with: "_")
-            : normalized
-        guard !draft.memberIdentifiers.contains(identifier) else { return }
-        draft.memberIdentifiers.append(identifier)
-        memberEmailInput = ""
-        focusedField = .email
     }
 
     private func currencyDisplayName(_ code: String) -> String {

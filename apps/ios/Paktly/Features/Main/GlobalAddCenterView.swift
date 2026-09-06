@@ -10,7 +10,7 @@ private enum GlobalAddAction: String, Hashable {
         switch self {
         case .expense: "Add expense"
         case .receipt: "Scan receipt"
-        case .invite: "Invite people"
+        case .invite: "Add people"
         case .friend: "Add a friend"
         }
     }
@@ -33,8 +33,8 @@ struct GlobalAddCenterView: View {
     @State private var showingAskPaktly = false
     @State private var expenseContext: ExpensePlanContext?
     @State private var receiptContext: ExpensePlanContext?
-    @State private var invitePlan: APIGroup?
-    @State private var showingAddFriend = false
+    @State private var showingAddPeople = false
+    @State private var peoplePlan: APIGroup?
     @State private var loadingAction: GlobalAddAction?
     @State private var errorMessage: String?
 
@@ -94,22 +94,13 @@ struct GlobalAddCenterView: View {
                         .buttonStyle(.plain)
 
                         contextualActionButton(
-                            title: "Invite people",
+                            title: "Add people",
                             subtitle: "Invite by username, email, link, or join code.",
                             icon: "person.badge.plus",
                             tint: PaktlyColor.coral.opacity(0.5),
                             action: .invite
                         )
 
-                        Button { showingAddFriend = true } label: {
-                            actionRow(
-                                title: "Add a friend",
-                                subtitle: "Save a name and email without adding them to a plan.",
-                                icon: "person.crop.circle.badge.plus",
-                                tint: PaktlyColor.mint
-                            )
-                        }
-                        .buttonStyle(.plain)
                     }
 
                     if let errorMessage {
@@ -165,16 +156,11 @@ struct GlobalAddCenterView: View {
                 )
                 .environmentObject(model)
             }
-            .sheet(item: $invitePlan) { group in
-                InviteView(
-                    groupID: group.id,
-                    canManageJoinLink: ["OWNER", "ADMIN"].contains(group.role ?? ""),
-                    completed: { dismiss() }
-                )
-                .environmentObject(model)
+            .sheet(item: $peoplePlan) { group in
+                AddPeopleView(contextPlan: group).environmentObject(model).presentationDetents([.medium, .large])
             }
-            .sheet(isPresented: $showingAddFriend) {
-                AddFriendView().environmentObject(model).presentationDetents([.medium])
+            .sheet(isPresented: $showingAddPeople) {
+                AddPeopleView(contextPlan: nil).environmentObject(model).presentationDetents([.medium, .large])
             }
         }
     }
@@ -199,6 +185,13 @@ struct GlobalAddCenterView: View {
             .buttonStyle(.plain)
             .disabled(loadingAction != nil)
         } else {
+            if action == .invite {
+                Button { showingAddPeople = true } label: {
+                    actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
+                }
+                .buttonStyle(.plain)
+                return
+            }
             NavigationLink(value: action) {
                 actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
             }
@@ -209,7 +202,7 @@ struct GlobalAddCenterView: View {
     private func open(_ action: GlobalAddAction, in group: APIGroup) {
         errorMessage = nil
         if action == .invite {
-            invitePlan = group
+            peoplePlan = group
             return
         }
         loadingAction = action

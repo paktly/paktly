@@ -167,6 +167,7 @@ struct AddPeopleView: View {
     @State private var saveAsFriend = false
     @State private var friendName = ""
     @State private var selectedPlanID: String?
+    @State private var planQuery = ""
     @State private var working = false
     @State private var errorMessage: String?
 
@@ -221,12 +222,61 @@ struct AddPeopleView: View {
                         }
                     }
 
-                    if contextPlan == nil && !model.groups.isEmpty {
-                        Picker("Invite to a plan (optional)", selection: $selectedPlanID) {
-                            Text("Save friend only").tag(String?.none)
-                            ForEach(model.groups) { Text($0.name).tag(String?.some($0.id)) }
+                    if contextPlan == nil {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("WHERE SHOULD THEY GO?")
+                                .font(.caption2.weight(.bold)).tracking(0.9)
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                            HStack(spacing: 10) {
+                                Image(systemName: "magnifyingglass").foregroundStyle(PaktlyColor.secondaryInk)
+                                TextField("Search plans", text: $planQuery)
+                                    .textInputAutocapitalization(.words).autocorrectionDisabled()
+                            }
+                            .padding(.horizontal, 14).frame(height: 50)
+                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+                            Button {
+                                selectedPlanID = nil
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                        .foregroundStyle(PaktlyColor.forest)
+                                        .frame(width: 38, height: 38)
+                                        .background(PaktlyColor.mint.opacity(0.4), in: Circle())
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Save friend only").font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+                                        Text("Keep them in your people list for later").font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                                    }
+                                    Spacer()
+                                    Image(systemName: selectedPlanID == nil ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedPlanID == nil ? PaktlyColor.forest : PaktlyColor.secondaryInk)
+                                }
+                                .padding(12)
+                                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+
+                            ForEach(filteredPlans) { group in
+                                Button { selectedPlanID = group.id } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "square.stack.3d.up.fill")
+                                            .foregroundStyle(PaktlyColor.forest)
+                                            .frame(width: 38, height: 38)
+                                            .background(PaktlyColor.lavender.opacity(0.45), in: Circle())
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(group.name).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+                                            Text("\(group.memberCount ?? 1) people · \(group.defaultCurrency)").font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                                        }
+                                        Spacer()
+                                        Image(systemName: selectedPlanID == group.id ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selectedPlanID == group.id ? PaktlyColor.forest : PaktlyColor.secondaryInk)
+                                    }
+                                    .padding(12)
+                                    .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .pickerStyle(.menu)
                     }
                     if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(PaktlyColor.coral) }
                 }
@@ -246,9 +296,15 @@ struct AddPeopleView: View {
     }
 
     private var canSubmit: Bool {
-        if !selected.isEmpty { return plan != nil }
+        if !selected.isEmpty { return plan != nil || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let validEmail = email.contains("@") && email.contains(".")
         return (validEmail && plan != nil) || (validEmail && !friendName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    private var filteredPlans: [APIGroup] {
+        let value = planQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !value.isEmpty else { return model.groups }
+        return model.groups.filter { $0.name.lowercased().contains(value) }
     }
 
     private func submit() async {
@@ -267,5 +323,104 @@ struct AddPeopleView: View {
             }
             dismiss()
         } catch { errorMessage = "We couldn’t complete this. Check the email and try again."; working = false }
+    }
+}
+
+struct FriendPickerView: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let onDone: ([String]) -> Void
+    @State private var friends: [APIFriend] = []
+    @State private var query = ""
+    @State private var selected: Set<String>
+    @State private var showingAddFriend = false
+    @State private var unmatchedEmail = ""
+    @State private var saveUnmatched = false
+    @State private var finishing = false
+
+    init(initialSelection: Set<String>, onDone: @escaping ([String]) -> Void) {
+        self.onDone = onDone
+        _selected = State(initialValue: initialSelection)
+    }
+
+    private var matches: [APIFriend] {
+        let value = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !value.isEmpty else { return friends }
+        return friends.filter { $0.name.lowercased().contains(value) || $0.email.lowercased().contains(value) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Search friends", text: $query)
+                        .textInputAutocapitalization(.words).autocorrectionDisabled()
+                }
+                if friends.isEmpty {
+                    Section {
+                        ContentUnavailableView("No friends saved", systemImage: "person.2", description: Text("Add a friend to make them available here."))
+                    }
+                } else {
+                    Section("Saved friends") {
+                        ForEach(matches) { friend in
+                            Button {
+                                if selected.contains(friend.email) { selected.remove(friend.email) } else { selected.insert(friend.email) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    PaktlyAvatar(name: friend.name, size: 36)
+                                    VStack(alignment: .leading, spacing: 2) { Text(friend.name).foregroundStyle(PaktlyColor.ink); Text(friend.email).font(.caption).foregroundStyle(PaktlyColor.secondaryInk) }
+                                    Spacer()
+                                    Image(systemName: selected.contains(friend.email) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selected.contains(friend.email) ? PaktlyColor.forest : PaktlyColor.secondaryInk)
+                                }
+                            }
+                        }
+                    }
+                }
+                if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && matches.isEmpty {
+                    Section("Not in your friends yet") {
+                        Text("Use \(query) as the name and enter their email to add them to this plan.")
+                            .font(.footnote).foregroundStyle(PaktlyColor.secondaryInk)
+                        TextField("Email address", text: $unmatchedEmail)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
+                        Toggle("Save as a friend", isOn: $saveUnmatched).tint(PaktlyColor.forest)
+                    }
+                }
+                Section {
+                    Button { showingAddFriend = true } label: { Label("Add a new friend", systemImage: "person.badge.plus") }
+                }
+            }
+            .navigationTitle("Choose friends")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(finishing ? "Saving…" : "Done") { Task { await finish() } }.disabled(finishing)
+                }
+            }
+            .task { friends = (try? await model.client.friends()) ?? [] }
+            .sheet(isPresented: $showingAddFriend) {
+                AddFriendView { friend in
+                    friends.append(friend)
+                    selected.insert(friend.email)
+                }
+                .environmentObject(model)
+                .presentationDetents([.medium])
+            }
+        }
+    }
+
+    private func finish() async {
+        guard !finishing else { return }
+        finishing = true
+        var result = selected
+        let name = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = unmatchedEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !name.isEmpty && matches.isEmpty && email.contains("@") && email.contains(".") {
+            result.insert(email)
+            if saveUnmatched { _ = try? await model.client.saveFriend(name: name, email: email) }
+        }
+        onDone(Array(result))
+        dismiss()
     }
 }

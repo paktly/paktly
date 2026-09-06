@@ -70,11 +70,7 @@ struct CreatePlanView: View {
     @State private var draft = PlanDraft()
     @State private var currentStep: Step = .details
     @State private var memberEmailInput = ""
-    @State private var friendSearch = ""
-    @State private var friends: [APIFriend] = []
-    @State private var saveTypedAsFriend = false
-    @State private var typedFriendName = ""
-    @State private var typedFriendEmailToSave: String?
+    @State private var showingFriendPicker = false
     @State private var creating = false
     @State private var planCreated = false
     @State private var createError: String?
@@ -120,6 +116,14 @@ struct CreatePlanView: View {
                 CurrencyPicker(selection: $draft.currency)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingFriendPicker) {
+                FriendPickerView(initialSelection: Set(draft.memberIdentifiers)) { selected in
+                    draft.memberIdentifiers = selected
+                    showingFriendPicker = false
+                }
+                .environmentObject(model)
+                .presentationDetents([.medium, .large])
             }
             .task { await loadFriends() }
         }
@@ -234,43 +238,24 @@ struct CreatePlanView: View {
                 "Who’s part of the plan?",
                 subtitle: "Invite people now, or keep going and add them from the plan later."
             )
-            VStack(alignment: .leading, spacing: 10) {
-                Text("FRIENDS")
-                    .font(.caption2.weight(.bold)).tracking(0.9)
-                    .foregroundStyle(PaktlyColor.secondaryInk)
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(PaktlyColor.secondaryInk)
-                    TextField("Search saved friends", text: $friendSearch)
-                        .textInputAutocapitalization(.words).autocorrectionDisabled()
-                }
-                .padding(.horizontal, 14).frame(height: 50)
-                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                if !filteredFriends.isEmpty {
-                    ForEach(filteredFriends) { friend in
-                        Button {
-                            if draft.memberIdentifiers.contains(friend.email) {
-                                draft.memberIdentifiers.removeAll { $0 == friend.email }
-                            } else {
-                                draft.memberIdentifiers.append(friend.email)
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                PaktlyAvatar(name: friend.name, size: 36)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(friend.name).font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
-                                    Text(friend.email).font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
-                                }
-                                Spacer()
-                                Image(systemName: draft.memberIdentifiers.contains(friend.email) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(draft.memberIdentifiers.contains(friend.email) ? PaktlyColor.forest : PaktlyColor.secondaryInk)
-                            }
-                            .padding(12)
-                            .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
+            Button { showingFriendPicker = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(PaktlyColor.forest)
+                        .frame(width: 38, height: 38)
+                        .background(PaktlyColor.mint.opacity(0.4), in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Choose from friends").font(.subheadline.weight(.semibold)).foregroundStyle(PaktlyColor.ink)
+                        Text(draft.memberIdentifiers.isEmpty ? "Search your saved people" : "\(draft.memberIdentifiers.count) selected")
+                            .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
                     }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(PaktlyColor.secondaryInk)
                 }
+                .padding(14)
+                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
             }
+            .buttonStyle(.plain)
             formField("Username or email", hint: "Sent after the plan is created") {
                 HStack(spacing: 10) {
                     TextField("@username or friend@example.com", text: $memberEmailInput)
@@ -291,22 +276,6 @@ struct CreatePlanView: View {
                     .buttonStyle(.plain)
                     .disabled(!isValidInviteIdentifier(memberEmailInput))
                     .accessibilityLabel("Add invitation")
-                }
-            }
-            if friends.isEmpty || (!friendSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredFriends.isEmpty) {
-                if friends.isEmpty {
-                    Text("No saved friends yet. Enter an email above to invite someone.")
-                        .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
-                } else {
-                    Text("No saved friend matches \(friendSearch). Enter their email above to invite them.")
-                        .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
-                }
-                Toggle("Save as a friend", isOn: $saveTypedAsFriend).tint(PaktlyColor.forest)
-                if friends.isEmpty || saveTypedAsFriend {
-                    formField("Friend’s name") {
-                        TextField("Name", text: $typedFriendName)
-                            .textInputAutocapitalization(.words)
-                    }
                 }
             }
             if draft.memberIdentifiers.isEmpty {
@@ -586,9 +555,6 @@ struct CreatePlanView: View {
                 .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 .joined(separator: " · ")
             do {
-                if let email = typedFriendEmailToSave, !typedFriendName.isEmpty {
-                    _ = try? await model.client.saveFriend(name: typedFriendName, email: email)
-                }
                 _ = try await model.createPlan(
                     name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
                     description: normalizedDescription.isEmpty ? nil : normalizedDescription,
@@ -660,20 +626,8 @@ struct CreatePlanView: View {
             : normalized
         guard !draft.memberIdentifiers.contains(identifier) else { return }
         draft.memberIdentifiers.append(identifier)
-        if saveTypedAsFriend, identifier.contains("@") {
-            if !friendSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                typedFriendName = friendSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            typedFriendEmailToSave = identifier
-        }
         memberEmailInput = ""
         focusedField = .email
-    }
-
-    private var filteredFriends: [APIFriend] {
-        let query = friendSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return friends }
-        return friends.filter { $0.name.lowercased().contains(query) || $0.email.lowercased().contains(query) }
     }
 
     private func loadFriends() async {

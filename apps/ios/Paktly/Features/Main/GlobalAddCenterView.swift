@@ -33,7 +33,7 @@ struct GlobalAddCenterView: View {
     @State private var showingAskPaktly = false
     @State private var expenseContext: ExpensePlanContext?
     @State private var receiptContext: ExpensePlanContext?
-    @State private var showingAddPeople = false
+    @State private var showingInvitePlanPicker = false
     @State private var peoplePlan: APIGroup?
     @State private var loadingAction: GlobalAddAction?
     @State private var errorMessage: String?
@@ -159,8 +159,13 @@ struct GlobalAddCenterView: View {
             .sheet(item: $peoplePlan) { group in
                 AddPeopleView(contextPlan: group).environmentObject(model).presentationDetents([.medium, .large])
             }
-            .sheet(isPresented: $showingAddPeople) {
-                AddPeopleView(contextPlan: nil).environmentObject(model).presentationDetents([.medium, .large])
+            .sheet(isPresented: $showingInvitePlanPicker) {
+                InvitePlanSelectionView { selectedPlan in
+                    showingInvitePlanPicker = false
+                    peoplePlan = selectedPlan
+                }
+                .environmentObject(model)
+                .presentationDetents([.large])
             }
         }
     }
@@ -186,7 +191,9 @@ struct GlobalAddCenterView: View {
             .disabled(loadingAction != nil)
         } else {
             if action == .invite {
-                Button { showingAddPeople = true } label: {
+                Button {
+                    showingInvitePlanPicker = true
+                } label: {
                     actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
                 }
                 .buttonStyle(.plain)

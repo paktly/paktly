@@ -125,7 +125,6 @@ struct CreatePlanView: View {
                 .environmentObject(model)
                 .presentationDetents([.medium, .large])
             }
-            .task { await loadFriends() }
         }
         .interactiveDismissDisabled(creating)
     }
@@ -628,10 +627,6 @@ struct CreatePlanView: View {
         draft.memberIdentifiers.append(identifier)
         memberEmailInput = ""
         focusedField = .email
-    }
-
-    private func loadFriends() async {
-        friends = (try? await model.client.friends()) ?? []
     }
 
     private func currencyDisplayName(_ code: String) -> String {

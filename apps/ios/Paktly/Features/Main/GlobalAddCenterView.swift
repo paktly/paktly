@@ -190,12 +190,12 @@ struct GlobalAddCenterView: View {
                     actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
                 }
                 .buttonStyle(.plain)
-                return
+            } else {
+                NavigationLink(value: action) {
+                    actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
+                }
+                .buttonStyle(.plain)
             }
-            NavigationLink(value: action) {
-                actionRow(title: title, subtitle: subtitle, icon: icon, tint: tint)
-            }
-            .buttonStyle(.plain)
         }
     }
 

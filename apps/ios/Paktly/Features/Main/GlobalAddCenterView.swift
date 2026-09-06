@@ -4,12 +4,14 @@ private enum GlobalAddAction: String, Hashable {
     case expense
     case receipt
     case invite
+    case friend
 
     var title: String {
         switch self {
         case .expense: "Add expense"
         case .receipt: "Scan receipt"
         case .invite: "Invite people"
+        case .friend: "Add a friend"
         }
     }
 
@@ -18,6 +20,7 @@ private enum GlobalAddAction: String, Hashable {
         case .expense: "Choose where this expense belongs."
         case .receipt: "Choose the plan for this receipt."
         case .invite: "Choose the plan you want to grow."
+        case .friend: "Save someone for quick invites later."
         }
     }
 }
@@ -31,6 +34,7 @@ struct GlobalAddCenterView: View {
     @State private var expenseContext: ExpensePlanContext?
     @State private var receiptContext: ExpensePlanContext?
     @State private var invitePlan: APIGroup?
+    @State private var showingAddFriend = false
     @State private var loadingAction: GlobalAddAction?
     @State private var errorMessage: String?
 
@@ -96,6 +100,16 @@ struct GlobalAddCenterView: View {
                             tint: PaktlyColor.coral.opacity(0.5),
                             action: .invite
                         )
+
+                        Button { showingAddFriend = true } label: {
+                            actionRow(
+                                title: "Add a friend",
+                                subtitle: "Save a name and email without adding them to a plan.",
+                                icon: "person.crop.circle.badge.plus",
+                                tint: PaktlyColor.mint
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     if let errorMessage {
@@ -158,6 +172,9 @@ struct GlobalAddCenterView: View {
                     completed: { dismiss() }
                 )
                 .environmentObject(model)
+            }
+            .sheet(isPresented: $showingAddFriend) {
+                AddFriendView().environmentObject(model).presentationDetents([.medium])
             }
         }
     }

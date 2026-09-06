@@ -179,6 +179,7 @@ struct MainTabView: View {
 
 private struct JoinLinkDecisionView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     let link: APIJoinLinkPreview
     @State private var working = false
     @State private var errorMessage: String?
@@ -186,6 +187,33 @@ private struct JoinLinkDecisionView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    Button {
+                        model.dismissJoinLink()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 15, weight: .bold))
+                            .frame(width: 36, height: 36)
+                            .foregroundStyle(PaktlyColor.forest)
+                            .background(PaktlyColor.surface, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close plan invitation")
+
+                    Spacer()
+
+                    Text("Plan invitation")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(PaktlyColor.ink)
+
+                    Spacer()
+
+                    Color.clear
+                        .frame(width: 36, height: 36)
+                        .accessibilityHidden(true)
+                }
+
                 Image(systemName: "person.3.fill")
                     .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(PaktlyColor.forest)
@@ -225,13 +253,6 @@ private struct JoinLinkDecisionView: View {
             }
             .padding(24)
             .background(PaktlyColor.background.ignoresSafeArea())
-            .navigationTitle("Plan invitation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Not now") { model.dismissJoinLink() }
-                }
-            }
         }
     }
 

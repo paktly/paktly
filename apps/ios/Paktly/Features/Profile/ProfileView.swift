@@ -30,6 +30,25 @@ struct ProfileView: View {
                     profileHeader
 
                     PaktlyPanel {
+                        NavigationLink {
+                            FriendsView().environmentObject(model)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.2.fill")
+                                    .foregroundStyle(PaktlyColor.forest)
+                                    .frame(width: 38, height: 38)
+                                    .background(PaktlyColor.mint.opacity(0.35), in: Circle())
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Friends").font(.headline).foregroundStyle(PaktlyColor.ink)
+                                    Text("Save people you invite often").font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(PaktlyColor.secondaryInk)
+                            }
+                        }
+                    }
+
+                    PaktlyPanel {
                         VStack(spacing: 12) {
                             LabeledContent("Display name") {
                                 TextField("Display name", text: $displayName)

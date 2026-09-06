@@ -14,6 +14,13 @@ struct APIUser: Codable, Identifiable, Sendable {
     let username: String?
     let smartAccount: APISmartAccount?
 }
+struct APIFriend: Codable, Identifiable, Sendable, Equatable {
+    let id: String
+    let name: String
+    let email: String
+    let linkedUserId: String?
+    let createdAt: Date
+}
 struct APIGroup: Codable, Identifiable, Sendable {
     let id: String
     let name: String
@@ -204,6 +211,9 @@ private struct UpdatedProfileResponse: Decodable {
 private struct GroupsResponse: Decodable {
     let groups: [APIGroup]
 }
+private struct FriendsResponse: Decodable { let friends: [APIFriend] }
+private struct FriendResponse: Decodable { let friend: APIFriend }
+private struct CreateFriendRequest: Encodable { let name: String; let email: String }
 
 private struct GroupResponse: Decodable {
     let group: APIGroup
@@ -744,6 +754,24 @@ actor APIClient {
             body: InvitationRequest(identifier: identifier)
         )
         return response.invitation.token
+    }
+
+    func friends() async throws -> [APIFriend] {
+        try await send(FriendsResponse.self, path: "friends").friends
+    }
+
+    @discardableResult
+    func saveFriend(name: String, email: String) async throws -> APIFriend {
+        try await send(
+            FriendResponse.self,
+            path: "friends",
+            method: "POST",
+            body: CreateFriendRequest(name: name, email: email)
+        ).friend
+    }
+
+    func deleteFriend(id: String) async throws {
+        try await sendWithoutResponse(path: "friends/\(id)", method: "DELETE")
     }
 
     func createJoinLink(groupID: String) async throws -> APIJoinLink {

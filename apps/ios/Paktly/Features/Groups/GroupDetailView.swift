@@ -565,6 +565,8 @@ struct InviteView: View {
     @State private var joinLink: APIJoinLink?
     @State private var creatingLink = false
     @State private var copiedLink = false
+    @State private var saveAsFriend = false
+    @State private var friendName = ""
 
     private var normalizedIdentifier: String {
         identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -604,6 +606,18 @@ struct InviteView: View {
                         .overlay {
                             RoundedRectangle(cornerRadius: 17, style: .continuous)
                                 .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
+                        }
+                    }
+
+                    if normalizedIdentifier.contains("@") {
+                        Toggle("Save as a friend", isOn: $saveAsFriend)
+                            .tint(PaktlyColor.forest)
+                        if saveAsFriend {
+                            TextField("Friend’s name", text: $friendName)
+                                .textInputAutocapitalization(.words)
+                                .padding(.horizontal, 16)
+                                .frame(height: 52)
+                                .background(PaktlyColor.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                         }
                     }
 
@@ -723,8 +737,16 @@ struct InviteView: View {
         sentIdentifier = nil
         do {
             developmentToken = try await model.client.invite(groupID: groupID, identifier: normalizedIdentifier)
+            if saveAsFriend, normalizedIdentifier.contains("@"), !friendName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                _ = try? await model.client.saveFriend(
+                    name: friendName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    email: normalizedIdentifier
+                )
+            }
             sentIdentifier = normalizedIdentifier
             identifier = ""
+            friendName = ""
+            saveAsFriend = false
             completed?()
         } catch {
             developmentToken = nil

@@ -334,9 +334,6 @@ struct FriendPickerView: View {
     @State private var query = ""
     @State private var selected: Set<String>
     @State private var showingAddFriend = false
-    @State private var unmatchedEmail = ""
-    @State private var saveUnmatched = false
-    @State private var finishing = false
 
     init(initialSelection: Set<String>, onDone: @escaping ([String]) -> Void) {
         self.onDone = onDone
@@ -379,11 +376,8 @@ struct FriendPickerView: View {
                 }
                 if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && matches.isEmpty {
                     Section("Not in your friends yet") {
-                        Text("Use \(query) as the name and enter their email to add them to this plan.")
+                        Text("Friend not found. Tap “Add a new friend” below to save them!")
                             .font(.footnote).foregroundStyle(PaktlyColor.secondaryInk)
-                        TextField("Email address", text: $unmatchedEmail)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
-                        Toggle("Save as a friend", isOn: $saveUnmatched).tint(PaktlyColor.forest)
                     }
                 }
                 Section {
@@ -395,7 +389,7 @@ struct FriendPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(finishing ? "Saving…" : "Done") { Task { await finish() } }.disabled(finishing)
+                    Button("Done") { onDone(Array(selected)); dismiss() }
                 }
             }
             .task { friends = (try? await model.client.friends()) ?? [] }
@@ -410,17 +404,4 @@ struct FriendPickerView: View {
         }
     }
 
-    private func finish() async {
-        guard !finishing else { return }
-        finishing = true
-        var result = selected
-        let name = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let email = unmatchedEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !name.isEmpty && matches.isEmpty && email.contains("@") && email.contains(".") {
-            result.insert(email)
-            if saveUnmatched { _ = try? await model.client.saveFriend(name: name, email: email) }
-        }
-        onDone(Array(result))
-        dismiss()
-    }
 }

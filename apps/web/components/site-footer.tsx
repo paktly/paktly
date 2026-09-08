@@ -4,7 +4,7 @@ import { BrandMark } from "./brand-mark";
 const footerGroups = [
   { title: "Product", links: [["Features", "/features"], ["Pricing", "/pricing"], ["Availability", "/availability"], ["Download", "/download"], ["FAQ", "/faq"]] },
   { title: "Trust", links: [["Security", "/security"], ["Privacy", "/privacy"], ["Accessibility", "/accessibility"], ["Financial disclosures", "/financial-disclosures"], ["Support", "/support"]] },
-  { title: "Legal", links: [["Terms", "/terms"], ["Acceptable Use", "/acceptable-use"], ["Cookie Policy", "/cookies"], ["Contact", "/contact"]] }
+  { title: "Legal", links: [["Terms", "/terms"], ["Account deletion", "/account-deletion"], ["Acceptable Use", "/acceptable-use"], ["Cookie Policy", "/cookies"], ["Contact", "/contact"]] }
 ] as const;
 
 export function SiteFooter() {

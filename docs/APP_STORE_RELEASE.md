@@ -87,7 +87,7 @@ Do not advertise cards, custody, yield, live payments or production wallet activ
 
 URLs: https://paktly.io/support, https://paktly.io/privacy, https://paktly.io/terms, https://paktly.io.
 
-Review notes: Explain planning/tracking vs money movement. Provide a tested reviewer login method privately in App Store Connect, never commit credentials. Describe Apple/Google/email OTP access, You → Delete account, + → Speak to Paktly → Allow and continue, AI confirmation, on-device receipt OCR, and Smart coming soon. Keep backend and reviewer access live during review.
+Review notes: Explain planning/tracking vs money movement. Configure and test the dedicated login described in [APP_REVIEW_ACCESS.md](APP_REVIEW_ACCESS.md), and provide its credentials privately in App Store Connect; never commit credentials. Describe Apple/Google/email OTP access, You → Delete account, + → Speak to Paktly → Allow and continue, AI confirmation, on-device receipt OCR, and Smart coming soon. Keep backend and reviewer access live during review.
 
 TestFlight: external group → add processed build → test/review details → Beta App Review → invite after approval. Public release is separate: select the tested build on an app version, complete listing/screenshots/privacy/age rating/review details, choose manual release for control, and submit App Review. Publish only after approval and the gates above.
 

@@ -178,8 +178,8 @@ struct WelcomeView: View {
     private func codeStep(challengeID: String) -> some View {
         VStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Check your email").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                Text("Enter the six-digit code sent to \(normalizedEmail).")
+                Text("Enter your sign-in code").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Enter the six-digit code for \(normalizedEmail).")
                     .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
             }
             TextField("000000", text: $code)

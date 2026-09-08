@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { loadEnvironment } from "../src/config/environment.js";
 
 describe("loadEnvironment", () => {
+  it("requires explicit review settings and validates expiry and PIN", () => {
+    expect(() => loadEnvironment({ APP_REVIEW_AUTH_ENABLED: "true" })).toThrow("Review authentication");
+    expect(() => loadEnvironment({ APP_REVIEW_PIN: "abc" })).toThrow();
+    expect(() => loadEnvironment({ APP_REVIEW_EXPIRES_AT: "tomorrow" })).toThrow();
+    const source = {
+      EMAIL_AUTH_ENABLED: "true", EMAIL_OTP_SECRET: "a".repeat(32),
+      SMTP_HOST: "smtp.example.com", SMTP_USERNAME: "test", SMTP_PASSWORD: "test",
+      APP_REVIEW_AUTH_ENABLED: "true", APP_REVIEW_PIN: "654321", APP_REVIEW_EXPIRES_AT: "2026-10-07T23:59:59Z"
+    };
+    expect(loadEnvironment(source).emailAuth?.review).toEqual({ pin: "654321", expiresAt: source.APP_REVIEW_EXPIRES_AT });
+    expect(loadEnvironment({ ...source, APP_REVIEW_AUTH_ENABLED: "false" }).emailAuth?.review).toBeUndefined();
+  });
   it("provides safe local defaults", () => {
     expect(loadEnvironment({})).toEqual({
       apiHost: "0.0.0.0",

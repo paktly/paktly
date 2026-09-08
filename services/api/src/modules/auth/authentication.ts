@@ -11,11 +11,14 @@ export async function requireAuthentication(request: FastifyRequest, reply: Fast
   if (!authorization?.startsWith("Bearer ")) return reply.unauthorized("Authentication is required.");
   const token = authorization.slice(7);
   const [row] = await request.server.db`
-    SELECT u.id, u.email, p.display_name
+    SELECT u.id, u.email, u.is_app_review, p.display_name
     FROM auth_sessions s JOIN users u ON u.id=s.user_id JOIN user_profiles p ON p.user_id=u.id
     WHERE s.token_hash=${hashToken(token)} AND s.revoked_at IS NULL AND s.expires_at>now() AND u.status='ACTIVE'
   `;
   if (!row) return reply.unauthorized("Your session is invalid or expired.");
+  if (row.is_app_review && !(request.server.appReviewExpiresAt > Date.now())) {
+    return reply.unauthorized("Review access has expired or is disabled.");
+  }
   request.authenticatedUser = { id: String(row.id), email: String(row.email), displayName: String(row.display_name) };
 }
 

@@ -47,6 +47,7 @@ export async function createApp(environment: Environment) {
     timeWindow: environment.rateLimitWindowMs
   });
   registerDatabase(app, environment.databaseUrl);
+  app.decorate("appReviewExpiresAt", environment.emailAuth?.review ? Date.parse(environment.emailAuth.review.expiresAt) : 0);
 
   app.addHook("onSend", async (request, reply) => {
     void reply.header("x-request-id", request.id);

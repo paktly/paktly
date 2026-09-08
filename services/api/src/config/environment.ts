@@ -25,6 +25,9 @@ const environmentSchema = z.object({
   SOCKETFI_NETWORK: z.enum(["TESTNET", "PUBLIC"]).default("TESTNET"),
   EMAIL_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   EMAIL_OTP_SECRET: z.string().min(32).optional(),
+  APP_REVIEW_AUTH_ENABLED: z.enum(["true", "false"]).default("false"),
+  APP_REVIEW_PIN: z.string().regex(/^\d{6}$/).optional(),
+  APP_REVIEW_EXPIRES_AT: z.string().datetime().optional(),
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(465),
   SMTP_SECURE: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
@@ -76,6 +79,7 @@ export type Environment = {
     otpSecret?: string;
     from: string;
     publicAppUrl?: string;
+    review?: { pin: string; expiresAt: string };
     smtp?: {
       host: string;
       port: number;
@@ -165,6 +169,11 @@ export function loadEnvironment(
       "Invalid environment configuration: EMAIL_OTP_SECRET, SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD are required when email authentication is enabled"
     );
   }
+  if (parsed.data.APP_REVIEW_AUTH_ENABLED === "true" && (
+    !parsed.data.EMAIL_AUTH_ENABLED || !parsed.data.APP_REVIEW_PIN || !parsed.data.APP_REVIEW_EXPIRES_AT
+  )) {
+    throw new Error("Review authentication requires email authentication, APP_REVIEW_PIN and APP_REVIEW_EXPIRES_AT");
+  }
   if (parsed.data.APPLE_AUTH_ENABLED && !source.APPLE_CLIENT_ID) {
     throw new Error("Invalid environment configuration: APPLE_CLIENT_ID is required when Apple authentication is enabled");
   }
@@ -209,6 +218,9 @@ export function loadEnvironment(
     },
     emailAuth: {
       enabled: parsed.data.EMAIL_AUTH_ENABLED,
+      ...(parsed.data.APP_REVIEW_AUTH_ENABLED === "true" ? {
+        review: { pin: parsed.data.APP_REVIEW_PIN!, expiresAt: parsed.data.APP_REVIEW_EXPIRES_AT! }
+      } : {}),
       ...(parsed.data.EMAIL_OTP_SECRET ? { otpSecret: parsed.data.EMAIL_OTP_SECRET } : {}),
       from: parsed.data.EMAIL_FROM,
       publicAppUrl: parsed.data.PUBLIC_APP_URL.replace(/\/$/, ""),

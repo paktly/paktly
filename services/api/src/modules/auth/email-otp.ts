@@ -7,6 +7,13 @@ import { reconcileInvitationNotifications } from "../notifications/service.js";
 
 const OTP_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
+export const APP_REVIEW_EMAIL = "app-review@paktly.io";
+
+function reviewConfiguration(configuration: NonNullable<Environment["emailAuth"]>) {
+  const review = configuration.review;
+  if (!review || Date.parse(review.expiresAt) <= Date.now()) throw new Error("EMAIL_AUTH_DISABLED");
+  return review;
+}
 
 function otpHash(challengeId: string, email: string, code: string, secret: string): string {
   return createHash("sha256")
@@ -23,6 +30,11 @@ export async function requestEmailOtp(
 ) {
   if (!configuration.enabled || !configuration.otpSecret) throw new Error("EMAIL_AUTH_DISABLED");
   const normalizedEmail = email.trim().toLowerCase();
+  const review = normalizedEmail === APP_REVIEW_EMAIL ? reviewConfiguration(configuration) : undefined;
+  if (review) {
+    const [existing] = await database`SELECT is_app_review FROM users WHERE email=${normalizedEmail}`;
+    if (existing && !existing.is_app_review) throw new Error("REVIEW_ACCOUNT_CONFLICT");
+  }
   const [recent] = await database`
     SELECT created_at FROM email_otp_challenges
     WHERE email=${normalizedEmail} AND consumed_at IS NULL
@@ -32,18 +44,19 @@ export async function requestEmailOtp(
     throw new Error("OTP_RATE_LIMITED");
   }
   const challengeId = randomUUID();
-  const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
+  const code = review?.pin ?? randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const expiresAt = new Date(Math.min(Date.now() + OTP_TTL_MINUTES * 60_000, review ? Date.parse(review.expiresAt) : Infinity));
   await database.begin(async (tx) => {
     await tx`
       UPDATE email_otp_challenges SET consumed_at=now()
       WHERE email=${normalizedEmail} AND consumed_at IS NULL
     `;
     await tx`
-      INSERT INTO email_otp_challenges(id,email,code_hash,expires_at)
-      VALUES(${challengeId},${normalizedEmail},${otpHash(challengeId, normalizedEmail, code, configuration.otpSecret!)},${expiresAt})
+      INSERT INTO email_otp_challenges(id,email,code_hash,expires_at,is_app_review)
+      VALUES(${challengeId},${normalizedEmail},${otpHash(challengeId, normalizedEmail, code, configuration.otpSecret!)},${expiresAt},${Boolean(review)})
     `;
   });
+  if (review) return { challengeId, expiresAt: expiresAt.toISOString(), delivery: "app-review" };
   if (nodeEnvironment === "test") {
     return { challengeId, expiresAt: expiresAt.toISOString(), developmentCode: code };
   }
@@ -71,16 +84,21 @@ export async function verifyEmailOtp(
 ) {
   if (!configuration.enabled || !configuration.otpSecret) throw new Error("EMAIL_AUTH_DISABLED");
   const email = input.email.trim().toLowerCase();
-  return database.begin(async (tx) => {
+  const review = email === APP_REVIEW_EMAIL ? reviewConfiguration(configuration) : undefined;
+  const result = await database.begin(async (tx) => {
     const [challenge] = await tx`
       SELECT * FROM email_otp_challenges WHERE id=${input.challengeId} FOR UPDATE
     `;
     if (!challenge || challenge.consumed_at || String(challenge.email) !== email) {
       throw new Error("OTP_INVALID");
     }
+    if (Boolean(challenge.is_app_review) !== Boolean(review)) throw new Error("OTP_INVALID");
+    if (review && otpHash(input.challengeId, email, review.pin, configuration.otpSecret!) !== String(challenge.code_hash)) {
+      throw new Error("OTP_INVALID");
+    }
     if (new Date(String(challenge.expires_at)).getTime() <= Date.now()) {
       await tx`UPDATE email_otp_challenges SET consumed_at=now() WHERE id=${input.challengeId}`;
-      throw new Error("OTP_EXPIRED");
+      return { failure: "OTP_EXPIRED" };
     }
     const attempts = Number(challenge.attempts);
     if (attempts >= MAX_ATTEMPTS) throw new Error("OTP_ATTEMPTS_EXCEEDED");
@@ -92,20 +110,23 @@ export async function verifyEmailOtp(
           consumed_at=CASE WHEN attempts+1>=${MAX_ATTEMPTS} THEN now() ELSE consumed_at END
         WHERE id=${input.challengeId}
       `;
-      throw new Error("OTP_INVALID");
+      return { failure: "OTP_INVALID" };
     }
     await tx`UPDATE email_otp_challenges SET consumed_at=now() WHERE id=${input.challengeId}`;
 
     const [existing] = await tx`
-      SELECT u.id,u.email,p.display_name,p.username FROM users u
+      SELECT u.id,u.email,u.is_app_review,u.status,p.display_name,p.username FROM users u
       JOIN user_profiles p ON p.user_id=u.id WHERE u.email=${email}
     `;
     let user = existing;
+    if (existing && (existing.status !== "ACTIVE" || Boolean(existing.is_app_review) !== Boolean(review))) {
+      throw new Error("OTP_INVALID");
+    }
     let isNewUser = false;
     if (!user) {
       isNewUser = true;
       [user] = await tx`
-        INSERT INTO users(id,email) VALUES(${randomUUID()},${email}) RETURNING id,email
+        INSERT INTO users(id,email,is_app_review) VALUES(${randomUUID()},${email},${Boolean(review)}) RETURNING id,email
       `;
       if (!user) throw new Error("USER_CREATION_FAILED");
       await tx`
@@ -116,7 +137,7 @@ export async function verifyEmailOtp(
     if (!user) throw new Error("USER_SESSION_FAILED");
     await reconcileInvitationNotifications(tx, String(user.id), email);
     const accessToken = randomUUID() + randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
+    const expiresAt = new Date(Math.min(Date.now() + 30 * 24 * 60 * 60 * 1_000, review ? Date.parse(review.expiresAt) : Infinity));
     await tx`
       INSERT INTO auth_sessions(id,user_id,token_hash,expires_at)
       VALUES(${randomUUID()},${String(user.id)},${hashToken(accessToken)},${expiresAt})
@@ -134,4 +155,7 @@ export async function verifyEmailOtp(
       }
     };
   });
+  // Throw outside the transaction so failed-attempt and expiry updates commit.
+  if ("failure" in result) throw new Error(result.failure);
+  return result;
 }

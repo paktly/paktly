@@ -2,7 +2,7 @@ import postgres, { type Sql } from "postgres";
 import type { FastifyInstance } from "fastify";
 
 declare module "fastify" {
-  interface FastifyInstance { db: Sql; }
+  interface FastifyInstance { db: Sql; appReviewExpiresAt: number; }
   interface FastifyRequest { authenticatedUser?: { id: string; email: string; displayName: string }; }
 }
 

@@ -558,6 +558,7 @@ struct InviteView: View {
     let canManageJoinLink: Bool
     var completed: (() -> Void)? = nil
     @State private var identifier = ""
+    @FocusState private var identifierFocused: Bool
     @State private var developmentToken: String?
     @State private var sending = false
     @State private var errorMessage: String?
@@ -595,6 +596,7 @@ struct InviteView: View {
                             Image(systemName: "person.badge.plus")
                                 .foregroundStyle(PaktlyColor.secondaryInk)
                             TextField("@username or friend@example.com", text: $identifier)
+                                .focused($identifierFocused)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
                                 .autocorrectionDisabled()
@@ -608,6 +610,9 @@ struct InviteView: View {
                                 .stroke(PaktlyColor.secondaryInk.opacity(0.16), lineWidth: 1)
                         }
                     }
+
+                    EmailDomainSuggestions(text: $identifier, isFocused: identifierFocused)
+                        .disabled(sending)
 
                     if normalizedIdentifier.contains("@") {
                         Toggle("Save as a friend", isOn: $saveAsFriend)

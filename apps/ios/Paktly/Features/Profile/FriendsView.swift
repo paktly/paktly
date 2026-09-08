@@ -126,6 +126,7 @@ struct AddFriendView: View {
     var onSaved: ((APIFriend) -> Void)? = nil
     @State private var name = ""
     @State private var email = ""
+    @FocusState private var emailFocused: Bool
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -135,9 +136,12 @@ struct AddFriendView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $name).textInputAutocapitalization(.words)
+                    TextField("Name", text: $name).textInputAutocapitalization(.words).textContentType(.name)
                     TextField("Email address", text: $email)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
+                        .focused($emailFocused)
+                    EmailDomainSuggestions(text: $email, isFocused: emailFocused)
+                        .disabled(saving)
                 } header: { Text("Friend details") }
                 Section {
                     Text("Saved friends are available whenever you invite people to a plan. They can still receive an invitation even if they haven’t joined Paktly yet.").font(.footnote).foregroundStyle(PaktlyColor.secondaryInk)

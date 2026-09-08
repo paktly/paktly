@@ -4,6 +4,7 @@ import SwiftUI
 struct WelcomeView: View {
     @EnvironmentObject private var session: AppSession
     @State private var email = ""
+    @FocusState private var emailFocused: Bool
     @State private var code = ""
     @State private var challengeID: String?
     @State private var isRequesting = false
@@ -138,6 +139,7 @@ struct WelcomeView: View {
                 Image(systemName: "envelope")
                     .foregroundStyle(PaktlyColor.secondaryInk)
                 TextField("Email address", text: $email)
+                    .focused($emailFocused)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -167,6 +169,8 @@ struct WelcomeView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(PaktlyColor.secondaryInk.opacity(0.14), lineWidth: 1)
             }
+            EmailDomainSuggestions(text: $email, isFocused: emailFocused)
+                .disabled(isRequesting)
             errorText
         }
     }

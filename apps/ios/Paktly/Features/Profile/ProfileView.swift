@@ -54,6 +54,7 @@ struct ProfileView: View {
                             LabeledContent("Display name") {
                                 TextField("Display name", text: $displayName)
                                     .textInputAutocapitalization(.words)
+                                    .textContentType(.name)
                             }
 
                             Divider()

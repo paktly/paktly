@@ -184,6 +184,15 @@ struct ProfileView: View {
                         }
                         .font(.subheadline.weight(.semibold))
                     }
+                    PaktlyPanel {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Privacy & support").font(.headline)
+                            Link("Privacy Policy", destination: URL(string: "https://paktly.io/privacy")!)
+                            Link("Terms of Use", destination: URL(string: "https://paktly.io/terms")!)
+                            Link("Contact support", destination: URL(string: "https://paktly.io/support")!)
+                        }
+                        .font(.subheadline)
+                    }
                     Button("Delete account", role: .destructive) { showingAccountDeletion = true }
                         .font(.footnote.weight(.medium))
                         .frame(minHeight: 44)

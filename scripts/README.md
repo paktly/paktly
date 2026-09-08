@@ -8,3 +8,6 @@ Cross-ecosystem automation belongs here. JavaScript orchestration must not repla
 - `backup-postgres.sh` produces a checksummed PostgreSQL custom-format dump.
 
 Production setup and operational commands are in [`infrastructure/production/README.md`](../infrastructure/production/README.md).
+# App Store archive
+
+On a Mac with Xcode 26+ and signing configured, run `bash scripts/archive-ios.sh VERSION BUILD` from the repo root. Choose a matching App Store version and an unused build number. This creates a signed archive without uploading or publishing. Follow [the release checklist](../docs/APP_STORE_RELEASE.md) before submitting.

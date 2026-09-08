@@ -163,7 +163,7 @@ struct ReceiptScannerView: View {
                         captureActions
                     }
 
-                    Label("Nothing is saved until you review the details, payer, and split.", systemImage: "checkmark.shield")
+                    Label("Receipt images are read on your device. Only the expense details you confirm are saved to Paktly.", systemImage: "checkmark.shield")
                         .font(.caption)
                         .foregroundStyle(PaktlyColor.secondaryInk)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -2,6 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "../../components/page-hero";
 
-export const metadata: Metadata = { title: "Support | Paktly", description: "Get help with the Paktly prelaunch website and waitlist.", alternates: { canonical: "/support" } };
+export const metadata: Metadata = { title: "Support | Paktly", description: "Help with Paktly accounts, shared plans, invitations, expenses, and privacy.", alternates: { canonical: "/support" } };
 
-export default function SupportPage() { return <><PageHero eyebrow="SUPPORT" title="What can we help with?" description="Paktly is prelaunch, so support currently covers the website, waitlist, privacy requests, feedback, and security reports." /><section className="container support-grid"><a href="mailto:hello@paktly.io?subject=Paktly%20waitlist%20help"><span>01</span><h2>Waitlist help</h2><p>Signup trouble, email changes, or general early-access questions.</p></a><a href="mailto:privacy@paktly.io?subject=Paktly%20privacy%20request"><span>02</span><h2>Privacy request</h2><p>Access, correction, deletion, consent withdrawal, or another privacy right.</p></a><a href="mailto:security@paktly.io?subject=Paktly%20security%20report"><span>03</span><h2>Security report</h2><p>Report a vulnerability using the responsible-disclosure guidelines.</p></a><Link href="/faq"><span>04</span><h2>Read the FAQ</h2><p>Product, pricing, region, account, and infrastructure answers.</p></Link></section><section className="container support-note"><h2>Response expectations</h2><p>Prelaunch support is monitored on a best-effort basis and does not provide emergency, travel, payment, or account-recovery assistance. No money is currently held through Paktly. If you believe someone is in immediate danger, contact local emergency services.</p></section></>; }
+export default function SupportPage() {
+  return <>
+    <PageHero eyebrow="SUPPORT" title="How can we help?" description="Get help with your account, shared plans, invitations, and expenses. Never send passwords, one-time codes, private keys, or payment-card details." />
+    <section className="container support-grid">
+      <a href="mailto:hello@paktly.io?subject=Paktly%20app%20support"><span>01</span><h2>App support</h2><p>Include your app version, device model, and a short description. Redact personal information from screenshots.</p></a>
+      <Link href="/account-deletion"><span>02</span><h2>Delete your account</h2><p>Use You → Delete account in the app, or see the options if you cannot sign in.</p></Link>
+      <a href="mailto:privacy@paktly.io?subject=Paktly%20privacy%20request"><span>03</span><h2>Privacy request</h2><p>Ask about access, correction, deletion, or your data choices.</p></a>
+      <a href="mailto:security@paktly.io?subject=Paktly%20security%20report"><span>04</span><h2>Security report</h2><p>Report a suspected vulnerability without including credentials or other people’s data.</p></a>
+    </section>
+    <section className="container support-note"><h2>Before you contact us</h2><p>Check your connection and update Paktly. For an invitation, sign in with the invited email. For notifications, check both Paktly preferences and iOS Settings. Before retrying a slow expense request, check whether it was saved.</p><p>Recorded savings and settlements track money outside Paktly; they do not transfer funds. Support is not an emergency service.</p></section>
+  </>;
+}

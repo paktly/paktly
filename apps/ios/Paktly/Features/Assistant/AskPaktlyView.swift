@@ -32,6 +32,10 @@ struct AskPaktlyView: View {
     @State private var showingCurrencyPicker = false
 
     var body: some View {
+        AIDataConsentView { voiceContent }
+    }
+
+    private var voiceContent: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 26) {
@@ -69,6 +73,11 @@ struct AskPaktlyView: View {
                 guard !attemptedAutomaticStart else { return }
                 attemptedAutomaticStart = true
                 await startRecording()
+            }
+            .onDisappear {
+                realtimeStartTask?.cancel()
+                realtime.stop()
+                recorder.cancel()
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active, isReturningFromSettings else { return }

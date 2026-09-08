@@ -23,6 +23,9 @@ test-results/
 *.pem
 *.key
 *.p12
+*.p8
+*.ipa
+*.xcarchive/
 *.pfx
 *.mobileprovision
 *.cer

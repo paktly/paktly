@@ -57,6 +57,10 @@ jobs:
           TEST_DATABASE_URL: postgres://pakt:pakt_local_only@localhost:56432/pakt
       - name: Lighthouse quality gate
         run: pnpm --filter @pakt/web lighthouse
+      - name: Account deletion integration tests
+        run: pnpm --filter @pakt/api exec vitest run test/account-deletion.integration.test.ts
+        env:
+          TEST_ACCOUNT_DELETION_DATABASE_URL: postgres://pakt:pakt_local_only@localhost:56432/pakt
 
   ios:
     name: SwiftUI compile check

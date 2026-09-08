@@ -18,6 +18,10 @@ cd "$repo_root/apps/ios"
 archive_path="$PWD/build/Paktly-$version-$build.xcarchive"
 [[ ! -e "$archive_path" ]] || { echo "Archive already exists: $archive_path. Choose another build number." >&2; exit 1; }
 xcodegen generate
+device_family="$(xcodebuild -project Paktly.xcodeproj -target Paktly -configuration Release -showBuildSettings | awk '$1 == "TARGETED_DEVICE_FAMILY" { print $3 }')"
+[[ "$device_family" == "1" ]] || {
+  echo "Refusing to archive: Paktly must target iPhone only; effective device family is $device_family." >&2; exit 1;
+}
 plutil -lint Paktly/PrivacyInfo.xcprivacy Paktly/Paktly.entitlements
 xcodebuild -project Paktly.xcodeproj -scheme Paktly -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$archive_path" \

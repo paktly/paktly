@@ -74,8 +74,11 @@ jobs:
         working-directory: apps/ios
         run: xcodegen generate
       - name: Build and test without signing
+        # Check effective target settings; project-level values can be overridden.
         working-directory: apps/ios
         run: |
+          device_family="$(xcodebuild -project Paktly.xcodeproj -target Paktly -configuration Release -showBuildSettings | awk '$1 == "TARGETED_DEVICE_FAMILY" { print $3 }')"
+          test "$device_family" = "1"
           destination_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
           test -n "$destination_id"
           xcodebuild -project Paktly.xcodeproj -scheme Paktly -configuration Debug -destination "platform=iOS Simulator,id=$destination_id" CODE_SIGNING_ALLOWED=NO test

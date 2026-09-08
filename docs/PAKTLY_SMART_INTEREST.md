@@ -11,6 +11,12 @@ Authenticated `PUT` to the same path accepts that shape, rejects extra fields, a
 upserts only the authenticated user's row. Repeated writes do not create duplicates.
 Rows are removed when their user is deleted. API failures offer retry in the card.
 
+The card uses the existing Paktly brand mark. After a confirmed opt-in it collapses
+to a tappable status row. Returning users also see the compact row, based on their
+server-saved interest. Expanding reveals features and the removal action; removing
+interest restores the full card. Failed saves preserve the current presentation.
+Expansion respects Reduce Motion and exposes its state to VoiceOver.
+
 The prior ProfileView is preserved verbatim in
 `archive/paktly-smart/ProfileView.before-coming-soon.swift.txt`, outside the iOS build.
 The original activation view, AppSession activation method, SocketFi adapter, and

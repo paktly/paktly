@@ -2,22 +2,54 @@ import SwiftUI
 
 struct PaktlySmartInterestCard: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var interested: Bool?
     @State private var loading = true
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var expanded = false
+
+    private var showsDetails: Bool { interested != true || expanded }
 
     var body: some View {
         PaktlyPanel {
             VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .font(.title3)
-                        .foregroundStyle(PaktlyColor.forest)
-                        .accessibilityHidden(true)
-                    Spacer()
-                    PaktlyRowPill(text: "Coming soon")
+                if interested == true {
+                    Button {
+                        expanded.toggle()
+                    } label: {
+                        HStack(spacing: 12) {
+                            brandMark
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Paktly Smart")
+                                    .font(.headline)
+                                    .foregroundStyle(PaktlyColor.ink)
+                                Label("You’re on the list", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(PaktlyColor.forest)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(PaktlyColor.secondaryInk)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(saving)
+                    .accessibilityLabel("Paktly Smart. You’re on the interest list.")
+                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+                    .accessibilityHint(expanded ? "Hide feature details" : "Show coming-soon features and manage your interest")
+                } else {
+                    HStack {
+                        brandMark
+                        Spacer()
+                        PaktlyRowPill(text: "Coming soon")
+                    }
                 }
+                if showsDetails {
+                if interested == true { PaktlyRowPill(text: "Coming soon") }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Unlock more with Paktly Smart")
                         .font(.title3.weight(.semibold))
@@ -38,9 +70,6 @@ struct PaktlySmartInterestCard: View {
                 if loading {
                     ProgressView("Loading your interest…").font(.footnote)
                 } else if interested == true {
-                    Label("You’re on the interest list", systemImage: "checkmark.circle.fill")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(PaktlyColor.forest)
                     Button(saving ? "Updating…" : "Remove my interest") {
                         Task { await update(false) }
                     }
@@ -71,10 +100,18 @@ struct PaktlySmartInterestCard: View {
                             .frame(minHeight: 44)
                     }
                 }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showsDetails)
         .task { await load() }
+    }
+
+    private var brandMark: some View {
+        PaktlyMark(size: 28)
+            .frame(width: 44, height: 44)
+            .background(PaktlyColor.mint.opacity(0.35), in: RoundedRectangle(cornerRadius: 13))
     }
 
     private func feature(_ title: String, detail: String, icon: String) -> some View {
@@ -97,7 +134,10 @@ struct PaktlySmartInterestCard: View {
         loading = true
         errorMessage = nil
         defer { loading = false }
-        do { interested = try await model.client.smartInterest().interested }
+        do {
+            interested = try await model.client.smartInterest().interested
+            expanded = false
+        }
         catch is CancellationError { }
         catch { errorMessage = "We couldn’t load your interest status. Please try again." }
     }
@@ -107,7 +147,10 @@ struct PaktlySmartInterestCard: View {
         saving = true
         errorMessage = nil
         defer { saving = false }
-        do { interested = try await model.client.updateSmartInterest(value).interested }
+        do {
+            interested = try await model.client.updateSmartInterest(value).interested
+            expanded = false
+        }
         catch { errorMessage = "We couldn’t save your choice. Please try again." }
     }
 }

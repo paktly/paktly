@@ -9,7 +9,7 @@ struct ProfileView: View {
     @State private var username = ""
     @State private var isSaving = false
     @State private var saveError: String?
-    @State private var editingProfile = false
+    @State private var showingWalletActivation = false
     @State private var usernameStatus: UsernameAvailabilityField.Status = .optional
     @State private var showingNotificationSettings = false
 
@@ -49,7 +49,6 @@ struct ProfileView: View {
                     }
 
                     PaktlyPanel {
-                        DisclosureGroup("Edit profile", isExpanded: $editingProfile) {
                         VStack(spacing: 12) {
                             LabeledContent("Display name") {
                                 TextField("Display name", text: $displayName)
@@ -106,16 +105,10 @@ struct ProfileView: View {
                                     .foregroundStyle(PaktlyColor.coral)
                             }
                         }
-                        .padding(.top, 16)
-                        }
-                        .tint(PaktlyColor.forest)
                     }
 
-                    PaktlySmartInterestCard()
-                        .id(model.currentUser?.id)
-
-                    if let smartAccount = model.currentUser?.smartAccount {
                     PaktlyPanel {
+                        if let smartAccount = model.currentUser?.smartAccount {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack {
                                     Label("Smart account", systemImage: "checkmark.shield.fill")
@@ -129,7 +122,16 @@ struct ProfileView: View {
                                     .lineLimit(1).truncationMode(.middle)
                                     .textSelection(.enabled)
                             }
-                    }
+                        } else {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Label("Unlock Paktly Smart", systemImage: "sparkles")
+                                    .font(.headline).foregroundStyle(PaktlyColor.ink)
+                                Text("Activate a passkey-protected smart wallet when you’re ready to save, contribute, and access eligible payment features.")
+                                    .font(.subheadline).foregroundStyle(PaktlyColor.secondaryInk)
+                                Button("Activate Smart Wallet") { showingWalletActivation = true }
+                                    .buttonStyle(PaktlyPrimaryButtonStyle())
+                            }
+                        }
                     }
 
                     PaktlyPanel {
@@ -141,10 +143,10 @@ struct ProfileView: View {
                                     .frame(width: 38, height: 38)
                                     .background(PaktlyColor.mint.opacity(0.35), in: Circle())
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(model.currentUser?.smartAccount == nil ? "Account security" : "Wallet passkey active")
+                                    Text(model.currentUser?.smartAccount == nil ? "Email verified" : "Wallet passkey active")
                                         .font(.subheadline.weight(.semibold))
                                     Text(model.currentUser?.smartAccount == nil
-                                         ? "Keep access to the sign-in method you use for Paktly."
+                                         ? "Your Paktly account uses secure email codes."
                                          : "Your device securely authorizes wallet actions.")
                                         .font(.caption).foregroundStyle(PaktlyColor.secondaryInk)
                                 }
@@ -190,6 +192,16 @@ struct ProfileView: View {
             .background(PaktlyColor.background.ignoresSafeArea())
             .navigationBarHidden(true)
             .task(id: model.currentUser?.id) { loadProfile() }
+            .sheet(isPresented: $showingWalletActivation) {
+                SmartWalletActivationView(
+                    suggestedUsername: model.currentUser?.username ?? PaktlySmartUsername.make()
+                ) {
+                    await model.refresh()
+                    showingWalletActivation = false
+                }
+                .environmentObject(session)
+                .presentationDetents([.large])
+            }
             .sheet(isPresented: $showingNotificationSettings) {
                 NotificationPreferencesView()
                     .environmentObject(pushNotifications)

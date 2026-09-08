@@ -12,6 +12,7 @@ import { notificationRoutes } from "./modules/notifications/routes.js";
 import { assistantRoutes } from "./modules/assistant/routes.js";
 import { savingsRoutes } from "./modules/savings/routes.js";
 import { friendRoutes } from "./modules/friends/routes.js";
+import { smartRoutes } from "./modules/smart/routes.js";
 import { registerDatabase } from "./platform/database.js";
 import { registerErrorHandling } from "./platform/errors.js";
 import { loggerOptions } from "./platform/logger.js";
@@ -65,6 +66,7 @@ export async function createApp(environment: Environment) {
       await versionedApi.register(assistantRoutes(environment));
       await versionedApi.register(savingsRoutes);
       await versionedApi.register(friendRoutes);
+      await versionedApi.register(smartRoutes);
     },
     { prefix: "/api/v1" }
   );

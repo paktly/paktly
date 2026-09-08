@@ -301,6 +301,7 @@ struct APINotificationPreferences: Codable, Sendable {
 }
 
 private struct NotificationPreferencesResponse: Decodable { let preferences: APINotificationPreferences }
+struct APISmartInterest: Codable { let interested: Bool }
 
 private struct InvitationRequest: Encodable { let identifier: String }
 
@@ -721,6 +722,15 @@ actor APIClient {
     func notificationPreferences() async throws -> APINotificationPreferences {
         let response = try await send(NotificationPreferencesResponse.self, path: "notification-preferences")
         return response.preferences
+    }
+
+    func smartInterest() async throws -> APISmartInterest {
+        try await send(APISmartInterest.self, path: "me/smart-interest")
+    }
+
+    func updateSmartInterest(_ interested: Bool) async throws -> APISmartInterest {
+        try await send(APISmartInterest.self, path: "me/smart-interest", method: "PUT",
+                       body: APISmartInterest(interested: interested))
     }
 
     func updateNotificationPreferences(_ preferences: APINotificationPreferences) async throws -> APINotificationPreferences {

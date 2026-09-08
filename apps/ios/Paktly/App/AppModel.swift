@@ -44,28 +44,48 @@ final class AppModel: ObservableObject {
     @Published private(set) var currentUser: APIUser?
     let client: APIClient
     let offlineQueue: OfflineExpenseQueue
+    private var accountDataGeneration = 0
+
+    func clearDeletedAccountData() async {
+        accountDataGeneration += 1
+        try? await offlineQueue.clear()
+        PendingPushStore.clear()
+        PendingInvitationStore.clear()
+        PendingJoinLinkStore.clear()
+        groups = []; notifications = []; invitations = []
+        currentUser = nil; unreadNotificationCount = 0; pendingSyncCount = 0
+        youOweMinor = 0; youAreOwedMinor = 0
+        presentedInvitation = nil; presentedPlan = nil; presentedJoinLink = nil
+        focusedActivityEntityId = nil; activePlanId = nil; invitationError = nil
+        state = .idle
+    }
 
     init(client: APIClient = .shared, offlineQueue: OfflineExpenseQueue = OfflineExpenseQueue()) { self.client = client; self.offlineQueue = offlineQueue }
 
     func refresh() async {
+        let generation = accountDataGeneration
         state = .loading
         _ = await offlineQueue.synchronize(using: client)
+        guard generation == accountDataGeneration else { return }
         do {
             async let groupsRequest = client.groups()
             async let userRequest = client.me()
             let loadedGroups = try await groupsRequest
             let loadedUser = try await userRequest
+            guard generation == accountDataGeneration else { return }
             self.groups = loadedGroups
             currentUser = loadedUser
 
             // Notifications and invitations enhance the dashboard, but neither
             // should prevent owned or joined plans from loading.
             if let loadedNotifications = try? await client.notifications() {
+                guard generation == accountDataGeneration else { return }
                 notifications = loadedNotifications.0
                 unreadNotificationCount = loadedNotifications.1
                 try? await UNUserNotificationCenter.current().setBadgeCount(loadedNotifications.1)
             }
             if let loadedInvitations = try? await client.pendingInvitations() {
+                guard generation == accountDataGeneration else { return }
                 invitations = loadedInvitations
             }
             if let pendingPush = PendingPushStore.load() {
@@ -75,9 +95,11 @@ final class AppModel: ObservableObject {
             if let invitationToken = PendingInvitationStore.load() {
                 do {
                     let invitation = try await client.resolveInvitation(token: invitationToken)
+                    guard generation == accountDataGeneration else { return }
                     presentedInvitation = PresentedInvitation(invitation: invitation)
                     invitationError = nil
                 } catch {
+                    guard generation == accountDataGeneration else { return }
                     PendingInvitationStore.clear()
                     invitationError = "This invitation is unavailable or belongs to a different email address."
                 }
@@ -85,19 +107,27 @@ final class AppModel: ObservableObject {
             if let joinToken = PendingJoinLinkStore.load() {
                 do {
                     let preview = try await client.previewJoinLink(token: joinToken)
+                    guard generation == accountDataGeneration else { return }
                     presentedJoinLink = PresentedJoinLink(preview: preview, token: joinToken, code: nil)
                 } catch {
+                    guard generation == accountDataGeneration else { return }
                     PendingJoinLinkStore.clear()
                     invitationError = "This plan invite link is no longer available."
                 }
             }
             if let first = self.groups.first, let balanceData = try? await client.balances(groupID: first.id) {
+                guard generation == accountDataGeneration else { return }
                 dashboardCurrency = first.defaultCurrency
                 let own = balanceData.0.first { $0.userId == currentUser?.id }?.netMinor ?? 0
                 youOweMinor = max(0, -own); youAreOwedMinor = max(0, own)
             } else { youOweMinor = 0; youAreOwedMinor = 0 }
-            pendingSyncCount = await offlineQueue.count(); state = .loaded
-        } catch { state = .failed("We couldn’t refresh your shared plans.") }
+            let count = await offlineQueue.count()
+            guard generation == accountDataGeneration else { return }
+            pendingSyncCount = count; state = .loaded
+        } catch {
+            guard generation == accountDataGeneration else { return }
+            state = .failed("We couldn’t refresh your shared plans.")
+        }
     }
 
     func handleIncomingURL(_ url: URL) {

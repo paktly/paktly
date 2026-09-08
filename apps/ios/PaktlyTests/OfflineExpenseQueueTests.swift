@@ -14,5 +14,11 @@ final class OfflineExpenseQueueTests: XCTestCase {
         try await queue.enqueue(groupID: UUID().uuidString.lowercased(), draft: draft)
         let count = await queue.count()
         XCTAssertEqual(count, 1)
+        try await queue.clear()
+        let clearedCount = await queue.count()
+        XCTAssertEqual(clearedCount, 0)
+        let reopened = OfflineExpenseQueue(fileURL: fileURL)
+        let persistedCount = await reopened.count()
+        XCTAssertEqual(persistedCount, 0, "Deleted account expenses must not reappear after restarting")
     }
 }

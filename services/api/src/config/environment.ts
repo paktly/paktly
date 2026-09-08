@@ -34,6 +34,9 @@ const environmentSchema = z.object({
   PUBLIC_APP_URL: z.string().url().default("https://paktly.io"),
   APPLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   APPLE_CLIENT_ID: z.string().min(3).optional(),
+  APPLE_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/).optional(),
+  APPLE_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/).optional(),
+  APPLE_PRIVATE_KEY: z.string().min(100).optional(),
   GOOGLE_AUTH_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   GOOGLE_SERVER_CLIENT_ID: z.string().min(10).optional(),
   APNS_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
@@ -84,6 +87,9 @@ export type Environment = {
   appleAuth?: {
     enabled: boolean;
     clientId: string;
+    teamId?: string;
+    keyId?: string;
+    privateKey?: string;
   };
   googleAuth?: {
     enabled: boolean;
@@ -162,6 +168,10 @@ export function loadEnvironment(
   if (parsed.data.APPLE_AUTH_ENABLED && !source.APPLE_CLIENT_ID) {
     throw new Error("Invalid environment configuration: APPLE_CLIENT_ID is required when Apple authentication is enabled");
   }
+  const appleRevocationFields = [parsed.data.APPLE_TEAM_ID, parsed.data.APPLE_KEY_ID, parsed.data.APPLE_PRIVATE_KEY];
+  if (appleRevocationFields.some(Boolean) && !appleRevocationFields.every(Boolean)) {
+    throw new Error("Invalid environment configuration: configure APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY together");
+  }
   if (parsed.data.GOOGLE_AUTH_ENABLED && !source.GOOGLE_SERVER_CLIENT_ID) {
     throw new Error("Invalid environment configuration: GOOGLE_SERVER_CLIENT_ID is required when Google authentication is enabled");
   }
@@ -216,7 +226,10 @@ export function loadEnvironment(
     },
     appleAuth: {
       enabled: parsed.data.APPLE_AUTH_ENABLED,
-      clientId: parsed.data.APPLE_CLIENT_ID ?? "io.paktly.app"
+      clientId: parsed.data.APPLE_CLIENT_ID ?? "io.paktly.app",
+      ...(parsed.data.APPLE_TEAM_ID ? { teamId: parsed.data.APPLE_TEAM_ID } : {}),
+      ...(parsed.data.APPLE_KEY_ID ? { keyId: parsed.data.APPLE_KEY_ID } : {}),
+      ...(parsed.data.APPLE_PRIVATE_KEY ? { privateKey: parsed.data.APPLE_PRIVATE_KEY.replace(/\\n/g, "\n") } : {})
     },
     googleAuth: {
       enabled: parsed.data.GOOGLE_AUTH_ENABLED,

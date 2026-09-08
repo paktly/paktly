@@ -302,6 +302,13 @@ struct APINotificationPreferences: Codable, Sendable {
 
 private struct NotificationPreferencesResponse: Decodable { let preferences: APINotificationPreferences }
 struct APISmartInterest: Codable { let interested: Bool }
+struct APIAccountDeletionOptions: Decodable { let requiresApple: Bool; let available: Bool }
+struct APIAppleDeletionProof: Encodable { let authorizationCode: String; let nonce: String }
+private struct AccountDeletionRequest: Encodable {
+    let confirmation = "DELETE"
+    let apple: APIAppleDeletionProof?
+}
+private struct AccountDeletionResponse: Decodable { let deleted: Bool }
 
 private struct InvitationRequest: Encodable { let identifier: String }
 
@@ -726,6 +733,16 @@ actor APIClient {
 
     func smartInterest() async throws -> APISmartInterest {
         try await send(APISmartInterest.self, path: "me/smart-interest")
+    }
+
+    func accountDeletionOptions() async throws -> APIAccountDeletionOptions {
+        try await send(APIAccountDeletionOptions.self, path: "me/account-deletion")
+    }
+
+    func deleteAccount(apple: APIAppleDeletionProof? = nil) async throws -> Bool {
+        let response = try await send(AccountDeletionResponse.self, path: "me/account-deletion",
+                                      method: "POST", body: AccountDeletionRequest(apple: apple))
+        return response.deleted
     }
 
     func updateSmartInterest(_ interested: Bool) async throws -> APISmartInterest {

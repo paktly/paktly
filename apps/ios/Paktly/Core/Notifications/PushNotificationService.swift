@@ -89,6 +89,15 @@ final class PushNotificationService: NSObject, ObservableObject, UNUserNotificat
         try? await center.setBadgeCount(0)
     }
 
+    func clearDeletedAccountRegistration() async {
+        // The deletion transaction already removed every server device registration.
+        UserDefaults.standard.removeObject(forKey: tokenKey)
+        registrationError = nil
+        center.removeAllDeliveredNotifications()
+        center.removeAllPendingNotificationRequests()
+        try? await center.setBadgeCount(0)
+    }
+
     func recordRegistrationFailure(_ error: Error) {
         registrationError = "This device could not register for notifications."
     }

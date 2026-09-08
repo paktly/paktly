@@ -9,6 +9,10 @@ export const metadata: Metadata = {
 
 const sections = [
   {
+    title: "Delete in the app",
+    content: <><p>Open Paktly → You → Delete account. Read the explanation, confirm that you understand deletion cannot be undone, then select “Permanently delete account.” If your account is connected to Apple, confirm with that same Apple account to disconnect Sign in with Apple and complete deletion.</p><p>The app confirms successful deletion and signs you out. Cancelling before confirmation leaves your account unchanged. If deletion fails, follow the error instructions; do not assume that uninstalling the app deletes your account.</p></>
+  },
+  {
     title: "Request account deletion",
     content: <><p>You can request deletion of your Paktly account and associated personal data by emailing <a href="mailto:privacy@paktly.io?subject=Paktly%20account%20deletion">privacy@paktly.io</a> from the email address associated with your account. Use the subject “Paktly account deletion.”</p><p>This is a deletion request, not an unsubscribe or a request to sign out. We may need to verify account ownership before processing it. Never include a password, verification code, passkey, private key, or payment details.</p></>
   },
@@ -18,11 +22,11 @@ const sections = [
   },
   {
     title: "What the request covers",
-    content: <p>Account deletion covers your account and profile information and associated personal data, including saved friends, device registrations, notification settings, and product interest preferences. Shared plan records, expense history, and any records that must be retained require review so we can explain the treatment of those records and any applicable retention obligations.</p>
+    content: <><p>Deletion removes your sign-in connections and sessions, saved friends, device registrations, notifications, product interest preferences, and stored AI confirmation drafts. Your profile name, username, avatar reference, and email are removed or replaced with a deleted-member record. Pending offline expenses on the device completing deletion are discarded.</p><p>Shared financial amounts and internal references remain associated with “Deleted member” to preserve other members’ accounting. Descriptions you authored in those records are redacted. Other people’s independently saved contact information and copies they control are not erased by deleting your account.</p></>
   },
   {
     title: "Shared expenses and smart accounts",
-    content: <><p>Deleting your account does not constitute payment of an outstanding shared expense. Include any questions about unresolved balances in your request. Do not send funds to anyone claiming payment is needed to process a privacy request.</p><p>Deleting Paktly data does not erase public blockchain records or automatically close an independently controlled smart account. If you previously activated an experimental smart wallet, tell us so its relationship to your Paktly account can be reviewed without requesting your private credentials.</p></>
+    content: <><p>You can delete your account with outstanding balances. Deletion does not pay or forgive a shared expense. Another active member becomes the owner of plans you owned, where one is available. Do not send funds to anyone claiming payment is needed to process a privacy request.</p><p>Deleting Paktly data does not erase public blockchain records or close an independently controlled smart account. Preserve your wallet passkey and recovery access before deleting Paktly. Never share private credentials with support.</p></>
   },
   {
     title: "Processing and confirmation",

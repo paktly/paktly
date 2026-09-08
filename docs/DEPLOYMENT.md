@@ -2,6 +2,8 @@
 
 ## API
 
+Account deletion requires the API migration, updated iOS build, and a separate Sign in with Apple revocation key for Apple-linked accounts. See [ACCOUNT_DELETION.md](ACCOUNT_DELETION.md) for configuration and release checks.
+
 The API builds from the repository root so workspace dependencies remain available:
 
 ```bash

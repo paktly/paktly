@@ -12,6 +12,7 @@ struct ProfileView: View {
     @State private var editingProfile = false
     @State private var usernameStatus: UsernameAvailabilityField.Status = .optional
     @State private var showingNotificationSettings = false
+    @State private var showingAccountDeletion = false
 
     private var normalizedUsername: String? {
         let value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -183,6 +184,9 @@ struct ProfileView: View {
                         }
                         .font(.subheadline.weight(.semibold))
                     }
+                    Button("Delete account", role: .destructive) { showingAccountDeletion = true }
+                        .font(.footnote.weight(.medium))
+                        .frame(minHeight: 44)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
@@ -193,6 +197,12 @@ struct ProfileView: View {
             .task(id: model.currentUser?.id) { loadProfile() }
             .sheet(isPresented: $showingNotificationSettings) {
                 NotificationPreferencesView()
+                    .environmentObject(pushNotifications)
+            }
+            .sheet(isPresented: $showingAccountDeletion) {
+                AccountDeletionView()
+                    .environmentObject(model)
+                    .environmentObject(session)
                     .environmentObject(pushNotifications)
             }
             .task { await pushNotifications.refreshAuthorizationState() }

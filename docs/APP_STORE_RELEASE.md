@@ -7,7 +7,7 @@ This is a handoff checklist, not certification of launch readiness.
 - Legal operator confirmed by the owner: TINKERPAL LLC. Public contact address and launch countries remain pending. Finalize jurisdiction wording and contact details in `/privacy`, `/terms`, `/contact` with legal review before public submission.
 - Verify hello@paktly.io, privacy@paktly.io, legal@paktly.io and security@paktly.io are monitored.
 - Approve actual retention for shared financial records, AI drafts, provider processing, access logs and backups. Backup script defaults to 14 days, but deployed settings/offsite copies must be verified. Reapply deletions after any restore; see ACCOUNT_DELETION.md.
-- Choose the App Store version and unused build number; repository 0.1.0 / 1 does not reflect previously uploaded builds.
+- App Store version is 1.0. Choose an unused build number; the repository default build 1 does not reflect previously uploaded builds.
 - Complete agreements, availability, age rating, export compliance and EU trader status if applicable. Do not guess legal answers from use of HTTPS alone.
 
 ## Implemented preparation
@@ -15,6 +15,8 @@ This is a handoff checklist, not certification of launch readiness.
 Voice asks explicit OpenAI permission before recording/transcription; Not now cancels and manual forms remain available. Permission is per screen visit. Receipt OCR is on-device Apple Vision, not an OpenAI upload. You includes privacy, terms, support and account deletion. The manifest now covers account/contact/financial/content/audio/device/usage information and the app-local UserDefaults reason. Debug/Release APNs environment and entitlement match. CI includes deletion integration tests. Git ignores Apple private keys and archives.
 
 ## Deploy after commit/push
+
+The XcodeGen project targets iPhone only (`TARGETED_DEVICE_FAMILY: "1"`). Orientation checkboxes do not select device support. Regenerate and upload a new build, then select that build in App Store Connect. This setting removes native iPad targeting, not iPhone compatibility mode on iPad; still smoke-test compatibility mode. If a public version already supported iPad, consult Apple before narrowing its supported device family.
 
 VPS:
 
@@ -39,7 +41,7 @@ open Paktly.xcodeproj
 Use Xcode 26+ and iOS 26+ SDK for uploads; minimum supported iOS stays 17. Run Product → Test and device checks below. From repository root, create a signed archive using your chosen version and unused build number:
 
 ```sh
-bash scripts/archive-ios.sh 0.1.0 12
+bash scripts/archive-ios.sh 1.0 12
 ```
 
 The numbers are examples. The script validates tools, overrides version/build for this archive, refuses to overwrite an archive, and never uploads or publishes. Alternatively change project.yml before generating and use Product → Archive. In Organizer: Validate App → Distribute App → App Store Connect. Do not choose TestFlight Internal Only for external/public candidates. Inspect archived production APNs entitlement and privacy report, including GoogleSignIn SDK disclosures.

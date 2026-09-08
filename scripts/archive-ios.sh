@@ -4,8 +4,8 @@ set -Eeuo pipefail
 [[ "$(uname -s)" == Darwin ]] || { echo "Run this on your Mac with Xcode installed." >&2; exit 1; }
 version="${1:-}"
 build="${2:-}"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$build" =~ ^[1-9][0-9]*$ ]] || {
-  echo "Usage: bash scripts/archive-ios.sh VERSION BUILD (example: 0.1.0 12). Choose an unused build number." >&2; exit 1;
+[[ "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ && "$build" =~ ^[1-9][0-9]*$ ]] || {
+  echo "Usage: bash scripts/archive-ios.sh VERSION BUILD (example: 1.0 12). Choose an unused build number." >&2; exit 1;
 }
 command -v xcodegen >/dev/null || { echo "Install XcodeGen: brew install xcodegen" >&2; exit 1; }
 xcode_major="$(xcodebuild -version | awk '/^Xcode / {split($2,v,"."); print v[1]}')"

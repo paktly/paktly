@@ -16,7 +16,8 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: 2
+    CURRENT_PROJECT_VERSION: 3
+    DEVELOPMENT_TEAM: GC29BX444D
 targets:
   Paktly:
     type: application
@@ -27,6 +28,8 @@ targets:
       path: Paktly/Info.plist
       properties:
         CFBundleDisplayName: Paktly
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSMicrophoneUsageDescription: Speak to Paktly uses your microphone only while you record a command.
         NSCameraUsageDescription: Paktly uses your camera to scan receipts you choose to add to a shared plan.
         NSPhotoLibraryUsageDescription: Paktly lets you select a receipt photo to prepare an expense for your review.
@@ -85,6 +88,7 @@ targets:
     scheme:
       testTargets:
         - PaktlyTests
+        - PaktlyUITests
   PaktlyTests:
     type: bundle.unit-test
     platform: iOS
@@ -95,4 +99,17 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.paktly.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+  PaktlyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: PaktlyUITests
+    dependencies:
+      - target: Paktly
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.paktly.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"

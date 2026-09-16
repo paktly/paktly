@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Integration suites share a disposable database; the MVP fixture truncates it.
+    fileParallelism: !(process.env.TEST_DATABASE_URL || process.env.TEST_ACCOUNT_DELETION_DATABASE_URL || process.env.TEST_APP_REVIEW_DATABASE_URL),
     coverage: {
       exclude: [
         "src/modules/**/routes.ts",

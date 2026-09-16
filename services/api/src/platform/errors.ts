@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { ApiError } from "@pakt/api-types";
 
+/** Explicitly safe messages for operational failures. Never expose arbitrary errors. */
+export class PublicAPIError extends Error {
+  constructor(readonly statusCode: number, readonly code: string, message: string) { super(message); }
+}
+
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setNotFoundHandler((request, reply) => {
     const payload: ApiError = {
@@ -27,8 +32,8 @@ export function registerErrorHandling(app: FastifyInstance): void {
 
     const payload: ApiError = {
       error: {
-        code: isServerError ? "INTERNAL_ERROR" : "REQUEST_ERROR",
-        message: isServerError
+        code: error instanceof PublicAPIError ? error.code : isServerError ? "INTERNAL_ERROR" : "REQUEST_ERROR",
+        message: isServerError && !(error instanceof PublicAPIError)
           ? "Something went wrong. Please try again."
           : normalizedError.message,
         requestId: request.id

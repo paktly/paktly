@@ -14,6 +14,7 @@ struct AccountDeletionView: View {
     @State private var completed = false
     @State private var nonce: String?
     @State private var errorMessage: String?
+    @State private var requestID: String?
 
     var body: some View {
         NavigationStack {
@@ -62,7 +63,10 @@ struct AccountDeletionView: View {
                     Section { Text("Apple account deletion is temporarily unavailable. Please try again later.") }
                 }
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(PaktlyColor.coral) }
+                    Section {
+                        Text(errorMessage).foregroundStyle(PaktlyColor.coral)
+                        if let requestID { Text("Support reference: \(requestID)").font(.caption).textSelection(.enabled) }
+                    }
                 }
                 if !loading && options == nil {
                     Button("Try again") { Task { await load() } }
@@ -88,12 +92,14 @@ struct AccountDeletionView: View {
     private func load() async {
         loading = true
         errorMessage = nil
+        requestID = nil
         defer { loading = false }
         do { options = try await model.client.accountDeletionOptions() }
-        catch { errorMessage = "We couldn’t check your account. Please try again." }
+        catch { errorMessage = error.localizedDescription; requestID = (error as? APIError)?.requestID }
     }
 
     private func handleApple(_ result: Result<ASAuthorization, Error>) {
+        defer { nonce = nil }
         switch result {
         case .success(let authorization):
             guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
@@ -114,6 +120,7 @@ struct AccountDeletionView: View {
         guard confirmed, !deleting else { return }
         deleting = true
         errorMessage = nil
+        requestID = nil
         do {
             guard try await model.client.deleteAccount(apple: apple) else {
                 errorMessage = "Deletion was not confirmed. Please try again."
@@ -127,7 +134,14 @@ struct AccountDeletionView: View {
             UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
             completed = true
         } catch {
-            errorMessage = "We couldn’t complete deletion. Check your connection and try again."
+            if let apiError = error as? APIError {
+                errorMessage = apiError.statusCode == 401
+                    ? "Your session is no longer active. Close this screen and sign out, then sign in again if needed."
+                    : apiError.localizedDescription
+                requestID = apiError.requestID
+            } else {
+                errorMessage = "We couldn’t confirm whether deletion finished. Reconnect and try again. If your session has ended, sign in again to check your account."
+            }
             deleting = false
         }
     }

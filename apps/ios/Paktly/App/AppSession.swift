@@ -5,6 +5,7 @@ import Foundation
 final class AppSession: ObservableObject {
     enum State: Equatable {
         case checking
+        case restoreFailed
         case signedOut
         case authenticating
         case needsProfile
@@ -26,17 +27,20 @@ final class AppSession: ObservableObject {
     }
 
     func restoreSession() async {
-        guard state == .checking else { return }
+        guard state == .checking || state == .restoreFailed else { return }
+        state = .checking
         guard KeychainTokenStore.load() != nil else {
             state = .signedOut
             return
         }
         do {
             let user = try await apiClient.me()
-            state = user.displayName == "Paktly member" ? .needsProfile : .signedIn
-        } catch {
+            state = user.needsProfileSetup ? .needsProfile : .signedIn
+        } catch let error as APIError where error.statusCode == 401 {
             KeychainTokenStore.clear()
             state = .signedOut
+        } catch {
+            state = .restoreFailed
         }
     }
 
@@ -63,7 +67,7 @@ final class AppSession: ObservableObject {
     }
 
     func completeAppleSignIn(identityToken: String, nonce: String, displayName: String?) async {
-        await authenticateFederated {
+        await authenticateFederated(requiresProfile: false) {
             try await apiClient.authenticateWithApple(
                 identityToken: identityToken,
                 nonce: nonce,
@@ -80,14 +84,15 @@ final class AppSession: ObservableObject {
     }
 
     private func authenticateFederated(
+        requiresProfile: Bool = true,
         operation: () async throws -> (APIUser, Bool)
     ) async {
         guard state != .authenticating else { return }
         state = .authenticating
         errorMessage = nil
         do {
-            let (user, isNewUser) = try await operation()
-            state = isNewUser || user.displayName == "Paktly member" ? .needsProfile : .signedIn
+            let (user, _) = try await operation()
+            state = requiresProfile && user.needsProfileSetup ? .needsProfile : .signedIn
         } catch {
             errorMessage = (error as? any LocalizedError)?.errorDescription
                 ?? "We couldn’t sign you in. Please try again."

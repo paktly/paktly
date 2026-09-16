@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Paktly</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.41146548867-btsmojjnpkc7nbmup1sdp4rnr8f1ula1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.paktly.invitation</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>paktly</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Paktly uses your camera to scan receipts you choose to add to a shared plan.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Speak to Paktly uses your microphone only while you record a command.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Paktly lets you select a receipt photo to prepare an expense for your review.</string>
+	<key>PaktlyAPIBaseURL</key>
+	<string>https://api.paktly.io/api/v1</string>
+	<key>PaktlyAPNSEnvironment</key>
+	<string>$(PAKTLY_APNS_ENVIRONMENT)</string>
+	<key>PaktlyGoogleIOSClientID</key>
+	<string>41146548867-btsmojjnpkc7nbmup1sdp4rnr8f1ula1.apps.googleusercontent.com</string>
+	<key>PaktlyGoogleServerClientID</key>
+	<string>41146548867-jof7pg8sm1gjddi8fq657s9esft7qi34.apps.googleusercontent.com</string>
+	<key>SocketFiAPIBaseURL</key>
+	<string>https://api.socket.fi</string>
+	<key>SocketFiApplicationID</key>
+	<string>io.paktly.app</string>
+	<key>SocketFiClientID</key>
+	<string>sf_client_live_mq2aa2w2ofwynne6gkftyendov8k</string>
+	<key>SocketFiNetwork</key>
+	<string>TESTNET</string>
+	<key>SocketFiRPID</key>
+	<string>socket.fi</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIImageName</key>
+		<string>PaktlyMark</string>
+	</dict>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>

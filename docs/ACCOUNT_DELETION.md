@@ -14,7 +14,7 @@ APPLE_KEY_ID=YOUR_SIGN_IN_WITH_APPLE_KEY_ID
 APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY_CONTENT\n-----END PRIVATE KEY-----"
 ```
 
-Keep `APPLE_CLIENT_ID=io.paktly.app`. Partial key configuration fails startup. Without revocation configuration, Apple-linked users cannot complete automatic deletion; configure and test before release. The server exchanges a fresh authorization code, verifies the token signature, issuer, audience, subject and nonce, then revokes the refresh token. Verification/revocation failures leave Paktly data unchanged. Tokens are not logged or persisted. Apple and PostgreSQL cannot form an atomic transaction: if cleanup fails after revocation, repeat Apple confirmation.
+Keep `APPLE_CLIENT_ID=io.paktly.app`. Partial key configuration fails startup. Without revocation configuration, Apple-linked users cannot complete automatic deletion; configure and test before release. The server exchanges a fresh authorization code, verifies the token signature, issuer, audience, subject and nonce, then revokes the refresh token (or a verified access token if no refresh token was returned). Verification/revocation failures leave Paktly data unchanged. Tokens are not logged or persisted. Database cleanup now executes before Apple revocation inside the uncommitted transaction, so a cleanup error does not first disconnect Apple. A verification/revocation failure rolls back cleanup. Apple and PostgreSQL still cannot form an atomic transaction: a commit failure after revocation remains possible; repeat Apple confirmation if necessary.
 
 Deploy from the repo root with `./scripts/deploy-production.sh`; migration 015 guards against stale writes recreating deleted account data. Rebuild the iOS app too.
 
@@ -36,3 +36,9 @@ pnpm --filter @pakt/api exec vitest run test/apple-revocation.test.ts
 ```
 
 Never use production data. Device release checks: email/Google deletion; Apple confirmation/cancel/wrong identity; server and offline failures; repeated taps; another member's balances; session rejection on another phone; fresh signup with the same email; local queue clearing; VoiceOver and large text. Swift compilation and real Apple token exchange require Xcode/device testing.
+
+## Diagnosing the September 2026 review failure
+
+The reviewer screenshot does not expose the underlying server error. Local SQL deletion tests pass, so do not assert the production cause without logs and a real Apple deletion test. Verify the deployed migration set and the Sign in with Apple key (not merely APNs access), key association, client ID and outbound access to appleid.apple.com.
+
+Failures now include a support request ID in the app. Server event `apple_deletion_failed` records only the stage, allowlisted Apple protocol reason, and upstream HTTP status. `invalid_client` indicates client/key configuration needs investigation; `invalid_grant` requires a fresh authorization code. Wrong-account confirmation returns a distinct 403. Unexpected database errors stay redacted from the client. Never log authorization codes, identity/refresh/access tokens, or private keys.

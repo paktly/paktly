@@ -113,6 +113,12 @@ export async function createFederatedSession(database: Sql, identity: FederatedI
       `;
     }
 
+    // Apple supplies the name only on first authorization. Preserve an existing
+    // profile, but use a supplied name to fill an unfinished email signup.
+    if (identity.displayName) {
+      await tx`UPDATE user_profiles SET display_name=${identity.displayName},updated_at=now()
+        WHERE user_id=${userId} AND display_name='Paktly member'`;
+    }
     const [profile] = await tx`
       SELECT u.id,u.email,p.display_name,p.username
       FROM users u JOIN user_profiles p ON p.user_id=u.id
@@ -134,6 +140,7 @@ export async function createFederatedSession(database: Sql, identity: FederatedI
         id: String(profile.id),
         email: String(profile.email),
         displayName: String(profile.display_name),
+        requiresProfileSetup: identity.provider !== "APPLE" && profile.display_name === "Paktly member",
         username: profile.username == null ? null : String(profile.username),
         smartAccount: null
       }

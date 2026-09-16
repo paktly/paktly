@@ -58,3 +58,55 @@ token and refreshes plans and notifications.
 ## Network separation
 
 Testnet and mainnet values will be separate required configuration groups. Production financial flags default to disabled; a production build must never fall back to testnet.
+
+## September 2026 App Store fixes: existing VPS rollout
+
+Use these steps for an existing installation of the production Compose stack. For a new VPS, follow [first deployment](../infrastructure/production/README.md) first. No new migration files were added by this patch; the deployment script still applies any previously pending migrations.
+
+1. Wait for the pushed commit’s GitHub Actions checks to pass. SSH into the VPS and enter the existing repository checkout. Ensure `git status --short` is clean before updating.
+
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   git log -1 --format='%h %s'
+   ./scripts/backup-postgres.sh
+   cat /opt/paktly/current-release
+   ```
+
+   Record the previous release tag for rollback. Check that the backup completed before proceeding.
+
+2. Edit the existing `/opt/paktly/.env` privately; preserve database passwords and other existing settings. Verify all four Apple values:
+
+   ```dotenv
+   APPLE_CLIENT_ID=io.paktly.app
+   APPLE_TEAM_ID=GC29BX444D
+   APPLE_KEY_ID=YOUR_SIGN_IN_WITH_APPLE_KEY_ID
+   APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY_CONTENT\n-----END PRIVATE KEY-----"
+   ```
+
+   Use a Sign in with Apple key associated with this App ID, not an APNs-only key. Keep the PEM on one line with literal `\n` separators. Do not commit or paste the real key into logs.
+
+   ```bash
+   chmod 600 /opt/paktly/.env
+   ./scripts/deploy-production.sh
+   curl --fail --show-error https://api.paktly.io/api/v1/ready
+   ```
+
+3. Inspect both services using the deployed tag:
+
+   ```bash
+   export PAKTLY_RELEASE="$(cat /opt/paktly/current-release)"
+   docker compose --env-file /opt/paktly/.env -f infrastructure/production/compose.yml ps
+   docker compose --env-file /opt/paktly/.env -f infrastructure/production/compose.yml logs --tail=100 api notification-worker
+   ```
+
+   Readiness confirms database connectivity; it does not verify Apple key validity. On a disposable account, complete fresh/returning Apple sign-in, confirm no forced name/email step, complete deletion, and verify re-signup. If deletion fails, capture the support request ID and sanitized `apple_deletion_failed` stage/reason. Do not resubmit based on readiness alone.
+
+4. If rollback is necessary, use the recorded tag:
+
+   ```bash
+   ./scripts/rollback-production.sh PREVIOUS_RELEASE_TAG
+   curl --fail --show-error https://api.paktly.io/api/v1/ready
+   ```
+
+   This restores the API and notification worker images, not database contents or environment changes.

@@ -107,8 +107,8 @@ importers:
         specifier: 6.2.3
         version: 6.2.3
       nodemailer:
-        specifier: ^9.0.6
-        version: 9.0.6
+        specifier: 9.1.1
+        version: 9.1.1
       openai:
         specifier: ^7.9.0
         version: 7.9.0(undici@8.10.0)(ws@8.21.3)(zod@4.4.3)
@@ -2303,8 +2303,8 @@ packages:
       encoding:
         optional: true
 
-  nodemailer@9.0.6:
-    resolution: {integrity: sha512-IQUGFdhdGwI9+AWX+FpUt4DLmvFaOjTMEoneTIWX/RXxuy1TdenPwWrvFMSfLkPKl+HQEXWuSAxEMMbPYXtBmg==}
+  nodemailer@9.1.1:
+    resolution: {integrity: sha512-izw9mVKFix6YSnC9eLgV6g1opl9DUlRio9ZNcq+Wu9Ujn2UwF+8Nl0B8nz22kEC+CTZCvinkxwJ0DeFbb6NwcQ==}
     engines: {node: '>=6.0.0'}
 
   object-inspect@1.13.4:
@@ -5218,7 +5218,7 @@ snapshots:
     dependencies:
       whatwg-url: 5.0.0
 
-  nodemailer@9.0.6: {}
+  nodemailer@9.1.1: {}
 
   object-inspect@1.13.4: {}
 

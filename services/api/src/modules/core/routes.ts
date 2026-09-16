@@ -186,7 +186,9 @@ export function coreRoutes(environment: Environment): FastifyPluginAsync {
           SELECT provider,network,address FROM wallet_addresses
           WHERE user_id=${userId} AND provider='SOCKETFI' AND network=${environment.socketFi.network}
         `;
-        return { profile: { ...profile, smartAccount: smartAccount ?? null } };
+        const [apple] = await app.db`SELECT id FROM auth_identities WHERE user_id=${userId} AND provider='APPLE'`;
+        return { profile: { ...profile, smartAccount: smartAccount ?? null,
+          requiresProfileSetup: !apple && profile?.display_name === "Paktly member" } };
       });
 
       authenticated.post("/me/username-availability", { config: { rateLimit: { max: 30, timeWindow: 60_000 } } }, async (request) => {

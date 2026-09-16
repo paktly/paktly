@@ -7,12 +7,12 @@ This is a handoff checklist, not certification of launch readiness.
 - Legal operator confirmed by the owner: TINKERPAL LLC. Public contact address and launch countries remain pending. Finalize jurisdiction wording and contact details in `/privacy`, `/terms`, `/contact` with legal review before public submission.
 - Verify hello@paktly.io, privacy@paktly.io, legal@paktly.io and security@paktly.io are monitored.
 - Approve actual retention for shared financial records, AI drafts, provider processing, access logs and backups. Backup script defaults to 14 days, but deployed settings/offsite copies must be verified. Reapply deletions after any restore; see ACCOUNT_DELETION.md.
-- App Store version is 1.0. Choose an unused build number; the repository default build 1 does not reflect previously uploaded builds.
+- App Store version is 1.0. Choose an unused build number; the repository default is now build 3 after the rejected build 2. Verify build 3 is unused in App Store Connect.
 - Complete agreements, availability, age rating, export compliance and EU trader status if applicable. Do not guess legal answers from use of HTTPS alone.
 
 ## Implemented preparation
 
-Voice asks explicit OpenAI permission before recording/transcription; Not now cancels and manual forms remain available. Permission is per screen visit. Receipt OCR is on-device Apple Vision, not an OpenAI upload. You includes privacy, terms, support and account deletion. The manifest now covers account/contact/financial/content/audio/device/usage information and the app-local UserDefaults reason. Debug/Release APNs environment and entitlement match. CI includes deletion integration tests. Git ignores Apple private keys and archives.
+Voice requests the system microphone permission directly, with no custom pre-permission screen. After microphone access is granted, a separate AI data-sharing disclosure asks for consent before recording/transcription. Continue accepts AI sharing; Don’t use AI or Close cancels. AI consent is per screen visit, and standard forms remain available. Receipt OCR is on-device Apple Vision, not an OpenAI upload. You includes privacy, terms, support and account deletion. The manifest now covers account/contact/financial/content/audio/device/usage information and the app-local UserDefaults reason. Debug/Release APNs environment and entitlement match. CI includes deletion integration tests. Git ignores Apple private keys and archives.
 
 ## Deploy after commit/push
 
@@ -48,12 +48,12 @@ The numbers are examples. The script validates tools, overrides version/build fo
 
 ## Physical-device release gate
 
-Record build/device/OS, expected and actual results. No device tests were run in this Linux workspace.
+Record build/device/OS, expected and actual results. See APP_STORE_AUDIT_2026-09-16.md for local simulator results and remaining device checks. Simulator tests do not validate real Apple token exchange or iOS 27 behavior.
 
 1. Email OTP/Google/Apple signup and returning login; cancel and offline errors.
 2. Plans, existing/new email invitations, accept/decline in app and via links; non-members denied access.
 3. All split methods, different payer, edits/deletion, currency conversion, balances, recorded settlements.
-4. Voice: Not now must make no AI/microphone request. Allow, microphone denial, Settings return, cancel/background/network loss, confirmation retry without duplicate saves.
+4. Voice: the system microphone prompt appears before any custom disclosure. Denial shows Settings/Close. After granting microphone access, Don’t use AI or Close must perform no recording or AI request. Test Continue, Settings return, cancel/background/network loss, and confirmation retry without duplicate saves.
 5. Receipt: denied camera, canceled picker, unreadable image, correct total/currency, manual corrections, plan context, exactly one saved expense.
 6. Delete disposable email/Google and real Apple accounts; cancel/failure, outstanding balances, another member’s unchanged amounts, old sessions rejected, fresh signup with same email, local queued expenses discarded.
 7. TestFlight production push, preferences, unread count and deep links.
@@ -87,7 +87,7 @@ Do not advertise cards, custody, yield, live payments or production wallet activ
 
 URLs: https://paktly.io/support, https://paktly.io/privacy, https://paktly.io/terms, https://paktly.io.
 
-Review notes: Explain planning/tracking vs money movement. Configure and test the dedicated login described in [APP_REVIEW_ACCESS.md](APP_REVIEW_ACCESS.md), and provide its credentials privately in App Store Connect; never commit credentials. Describe Apple/Google/email OTP access, You → Delete account, + → Speak to Paktly → Allow and continue, AI confirmation, on-device receipt OCR, and Smart coming soon. Keep backend and reviewer access live during review.
+Review notes: Explain planning/tracking vs money movement. Configure and test the dedicated login described in [APP_REVIEW_ACCESS.md](APP_REVIEW_ACCESS.md), and provide its credentials privately in App Store Connect; never commit credentials. Describe Apple/Google/email OTP access, You → Delete account, + → Speak to Paktly → system microphone permission → AI data sharing → Continue, AI confirmation, on-device receipt OCR, and Smart coming soon. Keep backend and reviewer access live during review.
 
 TestFlight: external group → add processed build → test/review details → Beta App Review → invite after approval. Public release is separate: select the tested build on an app version, complete listing/screenshots/privacy/age rating/review details, choose manual release for control, and submit App Review. Publish only after approval and the gates above.
 

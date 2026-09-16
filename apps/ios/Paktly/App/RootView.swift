@@ -14,6 +14,14 @@ struct RootView: View {
                 ProgressView("Opening Paktly…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(PaktlyColor.background)
+            case .restoreFailed:
+                ContentUnavailableView {
+                    Label("Unable to connect", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("We couldn’t check your account. Check your connection and try again.")
+                } actions: {
+                    Button("Try again") { Task { await session.restoreSession() } }
+                }
             case .signedOut, .authenticating, .failed:
                 WelcomeView()
             }

@@ -1,35 +1,439 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Activity" : {},
-    "Add money" : {},
-    "All caught up" : {},
-    "Continue with passkey" : {},
-    "Devices & sessions" : {},
-    "Friday" : {},
-    "Funding sources and trip money will live here." : {},
-    "Good afternoon, Alex" : {},
-    "Group activity will show here." : {},
-    "Home" : {},
-    "Next contribution" : {},
-    "No password or seed phrase required." : {},
-    "Notifications" : {},
-    "Passkey active" : {},
-    "Plan together.\nSave together.\nGo together." : {},
-    "Profile" : {},
-    "Security" : {},
-    "Sign out" : {},
-    "Signing in…" : {},
-    "Trip funding progress" : {},
-    "Trips" : {},
-    "UPCOMING" : {},
-    "Wallet" : {},
-    "We couldn’t sign you in. Please try again." : {},
-    "Your next adventure starts here." : {},
-    "Your next trip is taking shape." : {},
-    "YOU OWE" : {},
-    "YOU’RE OWED" : {},
-    "One place for the trip, the money, and everyone coming along." : {}
+    "·" : {
+
+    },
+    "“%@”" : {
+
+    },
+    "@%@" : {
+
+    },
+    "%@  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@"
+          }
+        }
+      }
+    },
+    "%@ found" : {
+
+    },
+    "%@ invited you" : {
+
+    },
+    "%@ invited you to join %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ invited you to join %2$@."
+          }
+        }
+      }
+    },
+    "%@ members · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ members · %2$@"
+          }
+        }
+      }
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "%@ people · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ people · %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "1 %@ =" : {
+
+    },
+    "A clear view of what comes in and goes out." : {
+
+    },
+    "Accept invitation" : {
+
+    },
+    "Activate Paktly Smart" : {
+
+    },
+    "Active %@" : {
+
+    },
+    "Activity" : {
+
+    },
+    "Add" : {
+
+    },
+    "Add a friend to make them available here." : {
+
+    },
+    "Add a receipt to %@" : {
+
+    },
+    "Add the name your groups will recognize. A username is optional." : {
+
+    },
+    "And more, coming to Paktly." : {
+
+    },
+    "Apple account deletion is temporarily unavailable. Please try again later." : {
+
+    },
+    "Auto settle this suggested amount" : {
+
+    },
+    "Back" : {
+
+    },
+    "Balances" : {
+
+    },
+    "Before you speak" : {
+
+    },
+    "Bring someone in" : {
+
+    },
+    "Bring your shared plans and money together." : {
+
+    },
+    "Bringing everything up to date…" : {
+
+    },
+    "By continuing, you agree to Paktly’s [Terms](https://paktly.io/terms) and acknowledge the [Privacy Policy](https://paktly.io/privacy)." : {
+
+    },
+    "Choose from friends" : {
+
+    },
+    "Choose who should be invited to %@." : {
+
+    },
+    "Confirm with the Apple account you use for Paktly to disconnect Sign in with Apple and delete your account." : {
+
+    },
+    "Continue with Google" : {
+
+    },
+    "Convert to the plan currency" : {
+
+    },
+    "Delete your Paktly account?" : {
+
+    },
+    "Email" : {
+
+    },
+    "Enter each member’s item total. Shared tax and tip can be added as separate items in a later edit." : {
+
+    },
+    "Enter the code shared by a plan organizer. You’ll review the plan before joining." : {
+
+    },
+    "Enter the six-digit code for %@." : {
+
+    },
+    "Enter your sign-in code" : {
+
+    },
+    "EXCHANGE RATE" : {
+
+    },
+    "Expires %@" : {
+
+    },
+    "Expires %@ · Up to %@ joins" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Expires %1$@ · Up to %2$@ joins"
+          }
+        }
+      }
+    },
+    "Finding the merchant, total, and date…" : {
+
+    },
+    "Friend details" : {
+
+    },
+    "Friend not found. Tap \"Add a new friend\" below to save them!" : {
+
+    },
+    "Friends" : {
+
+    },
+    "From the first idea to the final split, keep the plan, the goal, and the money behind it in one place." : {
+
+    },
+    "Get invitations, expense updates, settlements, and important plan changes when Paktly isn’t open." : {
+
+    },
+    "I HEARD" : {
+
+    },
+    "If you own a plan, another active member becomes its owner. Deleting Paktly does not close an independent smart wallet or erase blockchain records. Keep access to your wallet’s passkey." : {
+
+    },
+    "Invite an existing Paktly member by username, or use any email address. New members will receive a secure account-creation link." : {
+
+    },
+    "Join %@?" : {
+
+    },
+    "JOIN CODE" : {
+
+    },
+    "Keep private" : {
+
+    },
+    "Keep the full receipt inside the frame and avoid glare." : {
+
+    },
+    "Keep trusted contacts ready for your next plan." : {
+
+    },
+    "Let people join without entering an email. Links expire after seven days and can be replaced or revoked at any time." : {
+
+    },
+    "Loading activity…" : {
+
+    },
+    "LOCAL TESTING TOKEN" : {
+
+    },
+    "Make it yours" : {
+
+    },
+    "Make the plan.\nMake it happen.\nTogether." : {
+
+    },
+    "No commitment. Availability may vary by region." : {
+
+    },
+    "No outstanding balances in this plan." : {
+
+    },
+    "NOTES" : {
+
+    },
+    "Only share information you’re entitled to share. Review the result before saving; AI can make mistakes. You can use the standard forms without AI." : {
+
+    },
+    "OR" : {
+
+    },
+    "Paid by %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Paid by %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "paktly" : {
+
+    },
+    "Paktly reads the basics on this device, then lets you correct everything before saving." : {
+
+    },
+    "Paktly Smart" : {
+
+    },
+    "Passkey label" : {
+
+    },
+    "Pending expenses saved only on this phone will be discarded." : {
+
+    },
+    "PEOPLE TO INVITE" : {
+
+    },
+    "Percentages must add up to 100." : {
+
+    },
+    "Plan code" : {
+
+    },
+    "PLAN CURRENCY" : {
+
+    },
+    "Plan invitation" : {
+
+    },
+    "Plans" : {
+
+    },
+    "Privacy & support" : {
+
+    },
+    "Reading your receipt" : {
+
+    },
+    "Receipt currency" : {
+
+    },
+    "Review" : {
+
+    },
+    "Save people you invite often" : {
+
+    },
+    "Save profile" : {
+
+    },
+    "Saved friends are available whenever you invite people to a plan. They can still receive an invitation even if they haven’t joined Paktly yet." : {
+
+    },
+    "Security" : {
+
+    },
+    "Select a plan to invite people." : {
+
+    },
+    "SHAREABLE PLAN LINK" : {
+
+    },
+    "Shared by %@ · %@ members" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Shared by %1$@ · %2$@ members"
+          }
+        }
+      }
+    },
+    "Shared monetary records remain under “Deleted member” so other members’ balances stay correct. Your identifying descriptions are removed. Deletion does not pay or forgive outstanding expenses." : {
+
+    },
+    "SHARED PLANS · SHARED GOALS · SHARED MONEY" : {
+
+    },
+    "Show details" : {
+
+    },
+    "Speak to Paktly currently helps with expenses, plans, and invitations." : {
+
+    },
+    "Start anywhere. Paktly will carry the right plan context with you." : {
+
+    },
+    "Suggested settlements" : {
+
+    },
+    "That invitation could not be accepted." : {
+
+    },
+    "The rate is locked to this expense and will not change when market rates move later." : {
+
+    },
+    "This feature uses OpenAI" : {
+
+    },
+    "This labels the passkey on your device. Your Paktly profile can still be edited separately." : {
+
+    },
+    "This permanently removes your profile, sign-in connections, saved friends, notifications, and Paktly Smart interest. You’ll be signed out on all devices." : {
+
+    },
+    "This receipt is in %@, while the plan uses %@. Enter the rate shown by your card or trusted currency source." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This receipt is in %1$@, while the plan uses %2$@. Enter the rate shown by your card or trusted currency source."
+          }
+        }
+      }
+    },
+    "Top 3 of %@" : {
+
+    },
+    "Trips, homes, events—anything shared." : {
+
+    },
+    "Try adding friends from your People list first." : {
+
+    },
+    "Unlock more with Paktly Smart" : {
+
+    },
+    "Updates across every shared plan." : {
+
+    },
+    "Username" : {
+
+    },
+    "USERNAME OR EMAIL" : {
+
+    },
+    "Wallet availability, funding, and card access may require identity verification and regional eligibility." : {
+
+    },
+    "What would you like to add?" : {
+
+    },
+    "With your permission, Paktly sends your audio to OpenAI for transcription. Your transcript, name, account identifier, and shared-plan context—including plan details and member names, usernames, and emails—may also be sent to OpenAI to prepare your request." : {
+
+    },
+    "You’ll join as a member. Joining never gives anyone access to your personal account or wallet." : {
+
+    },
+    "You’re invited" : {
+
+    },
+    "Your everyday Paktly account stays the same. This adds a separate smart wallet protected by a passkey." : {
+
+    },
+    "Your identity and security" : {
+
+    },
+    "Your Paktly account and personal profile have been removed." : {
+
+    },
+    "Your people" : {
+
+    },
+    "YOUR POSITION" : {
+
+    }
   },
   "version" : "1.0"
 }

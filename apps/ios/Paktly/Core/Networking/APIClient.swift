@@ -13,6 +13,9 @@ struct APIUser: Codable, Identifiable, Sendable {
     let displayName: String
     let username: String?
     let smartAccount: APISmartAccount?
+    var requiresProfileSetup: Bool? = nil
+
+    var needsProfileSetup: Bool { requiresProfileSetup ?? (displayName == "Paktly member") }
 }
 struct APIFriend: Codable, Identifiable, Sendable, Equatable {
     let id: String
@@ -189,6 +192,7 @@ private struct ProfilePayload: Decodable {
     let displayName: String
     let username: String?
     let smartAccount: APISmartAccount?
+    let requiresProfileSetup: Bool?
 }
 
 private struct ProfileResponse: Decodable {
@@ -520,7 +524,8 @@ actor APIClient {
             email: response.profile.email,
             displayName: response.profile.displayName,
             username: response.profile.username,
-            smartAccount: response.profile.smartAccount
+            smartAccount: response.profile.smartAccount,
+            requiresProfileSetup: response.profile.requiresProfileSetup
         )
     }
 
@@ -965,15 +970,45 @@ actor APIClient {
             (200..<300).contains(httpResponse.statusCode)
         else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if let failure = try? decoder.decode(APIErrorResponse.self, from: data) {
+                throw APIError.serverResponse(statusCode, failure.error.message, failure.error.requestId)
+            }
             throw APIError.requestFailed(statusCode)
         }
         return data
     }
 }
 
-enum APIError: Error {
+private struct APIErrorResponse: Decodable {
+    struct Detail: Decodable { let message: String; let requestId: String? }
+    let error: Detail
+}
+
+enum APIError: LocalizedError {
     case requestFailed(Int)
+    case serverResponse(Int, String, String?)
     case secureStorage
+
+    var statusCode: Int? {
+        switch self {
+        case .requestFailed(let status), .serverResponse(let status, _, _): status
+        case .secureStorage: nil
+        }
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .serverResponse(_, let message, _): message
+        case .requestFailed(401): "Your session has expired. Please sign in again."
+        case .requestFailed: "The service couldn’t complete your request. Please try again."
+        case .secureStorage: "Your sign-in could not be saved securely. Please try again."
+        }
+    }
+
+    var requestID: String? {
+        if case .serverResponse(_, _, let id) = self { return id }
+        return nil
+    }
 }
 
 enum KeychainTokenStore {

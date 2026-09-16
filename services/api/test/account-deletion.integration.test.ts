@@ -1,7 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createApp } from "../src/app.js";
 import { loadEnvironment } from "../src/config/environment.js";
+
+import { AppleRevocationError, revokeAppleForDeletion } from "../src/modules/auth/apple-revocation.js";
+import type * as AppleRevocationModule from "../src/modules/auth/apple-revocation.js";
+vi.mock("../src/modules/auth/apple-revocation.js", async (importOriginal) => ({
+  ...await importOriginal<typeof AppleRevocationModule>(),
+  revokeAppleForDeletion: vi.fn()
+}));
 
 const databaseUrl = process.env.TEST_ACCOUNT_DELETION_DATABASE_URL;
 type Session = { accessToken: string; user: { id: string } };
@@ -70,5 +77,42 @@ describe.skipIf(!databaseUrl)("account deletion (isolated database)", () => {
     expect((await app.inject({ method: "GET", url: "/api/v1/me/account-deletion", headers })).json()).toEqual({ available: false, requiresApple: true });
     expect((await app.inject({ method: "POST", url: "/api/v1/me/account-deletion", headers, payload: { confirmation: "DELETE" } })).statusCode).toBe(503);
     expect((await app.inject({ method: "GET", url: "/api/v1/me", headers })).statusCode).toBe(200);
+  });
+});
+
+// Exercise the real authenticated route and SQL transaction; only Apple's
+// external service is mocked. Token validation itself is covered separately.
+describe.skipIf(!databaseUrl)("Apple account deletion transaction", () => {
+  let app: Awaited<ReturnType<typeof createApp>>;
+  beforeAll(async () => {
+    const environment = loadEnvironment({ NODE_ENV: "test", DATABASE_URL: databaseUrl!, LOG_LEVEL: "error" });
+    app = await createApp({ ...environment, appleAuth: {
+      enabled: true, clientId: "io.paktly.app", teamId: "TESTTEAM", keyId: "TESTKEY", privateKey: "test-only"
+    } });
+  });
+  afterAll(async () => { await app.close(); });
+
+  it("rolls back cleanup on Apple failure, permits retry, then invalidates every session", async () => {
+    const email = `${randomUUID()}@example.com`;
+    const session = (await app.inject({ method: "POST", url: "/api/v1/auth/dev-session", payload: { email, displayName: "Apple member" } })).json<Session>();
+    const second = (await app.inject({ method: "POST", url: "/api/v1/auth/dev-session", payload: { email, displayName: "Apple member" } })).json<Session>();
+    await app.db`INSERT INTO auth_identities (id,user_id,provider,provider_subject) VALUES (${randomUUID()},${session.user.id},'APPLE','apple-transaction-test')`;
+    const headers = { authorization: `Bearer ${session.accessToken}` };
+    const payload = { confirmation: "DELETE", apple: { authorizationCode: "fresh-code", nonce: "confirmation-nonce-123456" } };
+    vi.mocked(revokeAppleForDeletion).mockRejectedValueOnce(new AppleRevocationError("exchange", "invalid_client", 400));
+    const failed = await app.inject({ method: "POST", url: "/api/v1/me/account-deletion", headers, payload });
+    expect(failed.statusCode).toBe(502);
+    expect(failed.json().error).toMatchObject({ code: "APPLE_DELETION_FAILED", message: expect.stringContaining("has not been deleted"), requestId: expect.any(String) });
+    expect((await app.inject({ method: "GET", url: "/api/v1/me", headers })).statusCode).toBe(200);
+    expect(await app.db`SELECT id FROM auth_identities WHERE user_id=${session.user.id}`).toHaveLength(1);
+    const [user] = await app.db`SELECT email,status FROM users WHERE id=${session.user.id}`;
+    expect(user).toMatchObject({ email, status: "ACTIVE" });
+    vi.mocked(revokeAppleForDeletion).mockRejectedValueOnce(new AppleRevocationError("verification", "account_mismatch"));
+    expect((await app.inject({ method: "POST", url: "/api/v1/me/account-deletion", headers, payload })).statusCode).toBe(403);
+    vi.mocked(revokeAppleForDeletion).mockResolvedValueOnce();
+    expect((await app.inject({ method: "POST", url: "/api/v1/me/account-deletion", headers, payload })).json()).toEqual({ deleted: true });
+    for (const token of [session.accessToken, second.accessToken]) {
+      expect((await app.inject({ method: "GET", url: "/api/v1/me", headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(401);
+    }
   });
 });

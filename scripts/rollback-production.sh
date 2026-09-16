@@ -10,7 +10,7 @@ release="$1"
 [[ -f "$env_file" ]] || { echo "Missing production environment file: $env_file" >&2; exit 1; }
 docker image inspect "paktly-api:$release" >/dev/null
 export PAKTLY_RELEASE="$release" PAKTLY_ENV_FILE="$env_file"
-docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps api
+docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps api notification-worker
 published_endpoint="$(docker compose --env-file "$env_file" -f "$compose_file" port api 4000)"
 [[ -n "$published_endpoint" ]] || { echo "Could not determine the published API port" >&2; exit 1; }
 PAKTLY_VERIFY_URL="http://$published_endpoint" "$repo_root/scripts/verify-production.sh"

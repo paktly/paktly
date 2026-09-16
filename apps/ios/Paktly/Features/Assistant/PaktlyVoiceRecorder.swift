@@ -22,6 +22,7 @@ final class PaktlyVoiceRecorder: ObservableObject {
 
     func start(audioChunkHandler: (@Sendable (Data) -> Void)? = nil) async throws {
         guard await Self.requestMicrophonePermission() else { throw RecorderError.microphonePermissionDenied }
+        try Task.checkCancellation()
         self.audioChunkHandler = audioChunkHandler
 
         let session = AVAudioSession.sharedInstance()
@@ -112,7 +113,7 @@ final class PaktlyVoiceRecorder: ObservableObject {
         return output
     }
 
-    nonisolated private static func requestMicrophonePermission() async -> Bool {
+    nonisolated static func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
         }

@@ -156,4 +156,20 @@ suite("SocketFi identity persistence", () => {
     expect(apple.user.id).toBe(google.user.id);
     await expect(createFederatedSession(app.db, appleIdentity)).rejects.toThrow("FEDERATED_ASSERTION_REPLAYED");
   });
+  it.each(["Apple Person", undefined])("Apple signup and restoration never require a name (%s)", async (displayName) => {
+    const identity = { provider: "APPLE" as const, subject: randomUUID(), email: `${randomUUID()}@privaterelay.appleid.com`,
+      ...(displayName ? { displayName } : {}), assertionHash: randomUUID().replaceAll("-", "").padEnd(64, "0"),
+      expiresAt: new Date(Date.now() + 300_000) };
+    const first = await createFederatedSession(app.db, identity);
+    expect(first.user.requiresProfileSetup).toBe(false);
+    expect(first.user.displayName).toBe(displayName ?? "Paktly member");
+    const { displayName: _name, ...returningIdentity } = identity;
+    void _name;
+    const returning = await createFederatedSession(app.db, { ...returningIdentity, assertionHash: randomUUID().replaceAll("-", "").padEnd(64, "0") });
+    expect(returning.user.displayName).toBe(first.user.displayName);
+    const restored = await app.inject({ method: "GET", url: "/api/v1/me", headers: { authorization: `Bearer ${returning.accessToken}` } });
+    expect(restored.statusCode).toBe(200);
+    expect(restored.json().profile.requiresProfileSetup).toBe(false);
+  });
+
 });

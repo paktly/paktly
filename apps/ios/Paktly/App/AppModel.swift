@@ -47,14 +47,20 @@ final class AppModel: ObservableObject {
     private var accountDataGeneration = 0
 
     func clearDeletedAccountData() async {
-        accountDataGeneration += 1
+        await clearAccountCache()
         try? await offlineQueue.clear()
+    }
+
+    func clearAccountCache() async {
+        accountDataGeneration += 1
+        await offlineQueue.cancelSynchronization()
         PendingPushStore.clear()
         PendingInvitationStore.clear()
         PendingJoinLinkStore.clear()
         groups = []; notifications = []; invitations = []
         currentUser = nil; unreadNotificationCount = 0; pendingSyncCount = 0
         youOweMinor = 0; youAreOwedMinor = 0
+        dashboardCurrency = "USD"; lastExpenseMutation = nil
         presentedInvitation = nil; presentedPlan = nil; presentedJoinLink = nil
         focusedActivityEntityId = nil; activePlanId = nil; invitationError = nil
         state = .idle
@@ -65,13 +71,13 @@ final class AppModel: ObservableObject {
     func refresh() async {
         let generation = accountDataGeneration
         state = .loading
-        _ = await offlineQueue.synchronize(using: client)
-        guard generation == accountDataGeneration else { return }
         do {
+            let loadedUser = try await client.me()
+            guard generation == accountDataGeneration else { return }
+            _ = await offlineQueue.synchronize(using: client, userID: loadedUser.id)
+            guard generation == accountDataGeneration else { return }
             async let groupsRequest = client.groups()
-            async let userRequest = client.me()
             let loadedGroups = try await groupsRequest
-            let loadedUser = try await userRequest
             guard generation == accountDataGeneration else { return }
             self.groups = loadedGroups
             currentUser = loadedUser
@@ -121,7 +127,7 @@ final class AppModel: ObservableObject {
                 let own = balanceData.0.first { $0.userId == currentUser?.id }?.netMinor ?? 0
                 youOweMinor = max(0, -own); youAreOwedMinor = max(0, own)
             } else { youOweMinor = 0; youAreOwedMinor = 0 }
-            let count = await offlineQueue.count()
+            let count = await offlineQueue.count(userID: loadedUser.id)
             guard generation == accountDataGeneration else { return }
             pendingSyncCount = count; state = .loaded
         } catch {
@@ -287,10 +293,17 @@ final class AppModel: ObservableObject {
     }
 
     func submitExpense(groupID: String, draft: ExpenseDraft) async -> Bool {
+        guard let userID = currentUser?.id else { return false }
+        let generation = accountDataGeneration
         do { try await client.addExpense(groupID: groupID, draft: draft) }
-        catch is URLError { try? await offlineQueue.enqueue(groupID: groupID, draft: draft) }
+        catch is URLError {
+            guard generation == accountDataGeneration else { return false }
+            do { try await offlineQueue.enqueue(groupID: groupID, draft: draft, userID: userID) }
+            catch { state = .failed("The expense couldn’t be saved on this device. Please try again."); return false }
+        }
         catch { state = .failed("The expense could not be saved. Check the split and try again."); return false }
-        pendingSyncCount = await offlineQueue.count()
+        guard generation == accountDataGeneration else { return false }
+        pendingSyncCount = await offlineQueue.count(userID: userID)
         lastExpenseMutation = ExpenseMutation(planID: groupID)
         return true
     }

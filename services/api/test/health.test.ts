@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import Fastify from "fastify";
+import { PublicAPIError } from "../src/platform/errors.js";
 import { createApp } from "../src/app.js";
 import type { Environment } from "../src/config/environment.js";
 import { healthRoutes } from "../src/modules/health/routes.js";
@@ -127,5 +128,18 @@ describe("platform routes", () => {
       message: "Something went wrong. Please try again."
     });
     expect(response.body).not.toContain("database credential");
+  });
+});
+
+describe("safe operational errors", () => {
+  it("preserves only explicitly public operational messages", async () => {
+    const app = await createApp(testEnvironment);
+    apps.push(app);
+    app.get("/test/public-error", () => {
+      throw new PublicAPIError(502, "APPLE_DELETION_FAILED", "Please try Apple confirmation again.");
+    });
+    const response = await app.inject({ method: "GET", url: "/test/public-error" });
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error).toMatchObject({ code: "APPLE_DELETION_FAILED", message: "Please try Apple confirmation again.", requestId: expect.any(String) });
   });
 });

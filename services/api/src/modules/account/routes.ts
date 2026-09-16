@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import type { Environment } from "../../config/environment.js";
 import { requireAuthentication } from "../auth/authentication.js";
-import { canRevokeApple, revokeAppleForDeletion } from "../auth/apple-revocation.js";
+import { AppleRevocationError, canRevokeApple, revokeAppleForDeletion } from "../auth/apple-revocation.js";
+import { PublicAPIError } from "../../platform/errors.js";
 import { eraseAccount } from "./deletion.js";
 
 const input = z.object({
@@ -28,15 +29,27 @@ export function accountRoutes(environment: Environment): FastifyPluginAsync {
         if (!user || user.status !== "ACTIVE") throw app.httpErrors.unauthorized("This account is no longer active.");
         const [apple] = await tx`SELECT provider_subject FROM auth_identities WHERE user_id=${userId} AND provider='APPLE'`;
         if (apple) {
-          if (!canRevokeApple(environment.appleAuth)) throw app.httpErrors.serviceUnavailable("Apple account deletion is temporarily unavailable. Please try again later.");
+          if (!canRevokeApple(environment.appleAuth)) throw new PublicAPIError(503, "APPLE_DELETION_UNAVAILABLE", "Apple account deletion is temporarily unavailable. Please try again later.");
           if (!parsed.data.apple) throw app.httpErrors.badRequest("Confirm your Apple account to continue.");
+        }
+        // Exercise all database cleanup before the irreversible external revocation.
+        // An Apple failure rolls this transaction back, including the session deletion.
+        await eraseAccount(tx, userId, String(user.email));
+        if (apple) {
           try {
-            await revokeAppleForDeletion(environment.appleAuth!, String(apple.provider_subject), parsed.data.apple);
-          } catch {
-            throw app.httpErrors.badGateway("We couldn’t confirm and disconnect your Apple account. Please try again. Your Paktly account has not been deleted.");
+            await revokeAppleForDeletion(environment.appleAuth!, String(apple.provider_subject), parsed.data.apple!);
+          } catch (error) {
+            request.log.warn({ event: "apple_deletion_failed",
+              stage: error instanceof AppleRevocationError ? error.stage : "transport",
+              reason: error instanceof AppleRevocationError ? error.reason : "unavailable",
+              upstreamStatus: error instanceof AppleRevocationError ? error.upstreamStatus : undefined
+            }, "Apple account deletion failed");
+            if (error instanceof AppleRevocationError && error.reason === "account_mismatch") {
+              throw new PublicAPIError(403, "APPLE_ACCOUNT_MISMATCH", "Use the same Apple account you used to sign in to Paktly. Your Paktly account has not been deleted.");
+            }
+            throw new PublicAPIError(502, "APPLE_DELETION_FAILED", "We couldn’t disconnect your Apple account. Please try Apple confirmation again. Your Paktly account has not been deleted.");
           }
         }
-        await eraseAccount(tx, userId, String(user.email));
       });
       reply.header("Cache-Control", "no-store");
       return { deleted: true };

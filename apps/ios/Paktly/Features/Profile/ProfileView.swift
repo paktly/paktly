@@ -179,6 +179,7 @@ struct ProfileView: View {
                         Button("Sign out", role: .destructive) {
                             Task {
                                 await pushNotifications.unregister()
+                                await model.clearAccountCache()
                                 await session.signOut()
                             }
                         }
